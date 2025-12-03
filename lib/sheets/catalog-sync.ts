@@ -1,11 +1,11 @@
 import { google } from 'googleapis';
-import { getExpertRate, type ProblemStatus } from '../types';
+import { getExpertRate, type ProblemStatus } from '@/types/experts';
 import {
   upsertExpert,
   upsertProblem,
   getExpertByName,
   getDb,
-} from './db';
+} from '@/lib/db';
 
 // Name normalization map for matching across data sources
 const NAME_ALIASES: Record<string, string> = {

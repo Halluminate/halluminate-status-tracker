@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { fetchAllSheets } from '@/lib/googleSheets';
-import { CombinedData } from '@/types/sheets';
+import { fetchAllSheets } from '@/lib/sheets/status-fetcher';
+import { CombinedData } from '@/types/status';
 
 export const dynamic = 'force-dynamic';
 

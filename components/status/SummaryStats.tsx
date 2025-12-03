@@ -1,6 +1,6 @@
 'use client';
 
-import { SheetData } from '@/types/sheets';
+import { SheetData } from '@/types/status';
 
 interface SummaryStatsProps {
   data: SheetData[];

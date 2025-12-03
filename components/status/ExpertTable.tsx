@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ExpertSheetData, ExpertRow } from '@/types/sheets';
+import { ExpertSheetData, ExpertRow } from '@/types/status';
 
 interface ExpertTableProps {
   data: ExpertSheetData[];

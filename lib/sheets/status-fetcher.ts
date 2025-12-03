@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { SheetData, StatusRow, ExpertSheetData, ExpertRow } from '@/types/sheets';
+import { SheetData, StatusRow, ExpertSheetData, ExpertRow, CombinedData } from '@/types/status';
 
 const SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly'];
 

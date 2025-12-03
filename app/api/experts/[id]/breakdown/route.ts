@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getExpertProblemBreakdown } from '../../../../../lib/db';
+import { getExpertProblemBreakdown } from '@/lib/db';
 
 export async function GET(
   request: Request,

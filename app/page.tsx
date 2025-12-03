@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import StatusTable from '@/components/StatusTable';
-import ExpertTable from '@/components/ExpertTable';
-import SummaryStats from '@/components/SummaryStats';
-import { CombinedData } from '@/types/sheets';
+import StatusTable from '@/components/status/StatusTable';
+import ExpertTable from '@/components/status/ExpertTable';
+import SummaryStats from '@/components/status/SummaryStats';
+import { CombinedData } from '@/types/status';
 
 export default function Home() {
   const [data, setData] = useState<CombinedData | null>(null);

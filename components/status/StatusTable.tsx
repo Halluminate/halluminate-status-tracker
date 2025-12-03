@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment } from 'react';
-import { SheetData, StatusRow } from '@/types/sheets';
+import { SheetData, StatusRow } from '@/types/status';
 
 interface StatusTableProps {
   data: SheetData[];

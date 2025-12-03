@@ -6,8 +6,8 @@ import {
   upsertProblem,
   upsertTimeEntry,
   getExpertByName,
-} from './db';
-import { getExpertRate, type ProblemStatus } from '../types';
+} from '@/lib/db';
+import { getExpertRate, type ProblemStatus } from '@/types/experts';
 
 // Name normalization map for matching across data sources
 const NAME_ALIASES: Record<string, string> = {

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { syncAllSheets, syncPEProblems, syncIBProblems } from '../../../lib/google-sheets';
+import { syncAllSheets, syncPEProblems, syncIBProblems } from '@/lib/sheets/catalog-sync';
 
 export async function POST(request: Request) {
   try {
