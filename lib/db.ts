@@ -132,26 +132,37 @@ export function upsertProblem(problem: Partial<Problem> & { problemId: string; e
   const stmt = db.prepare(`
     INSERT INTO problems (
       problem_id, spec_number, environment, status,
-      sme_id, content_reviewer_id, engineer_id, reviewer_id,
-      week, problem_doc, ground_truth, spec_folder, pr_link,
-      blocker_reason, sonnet_pass_rate, opus_pass_rate, task_description
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      sme_id, feedback_id, qa_id, content_reviewer_id, engineer_id, reviewer_id, final_reviewer_id,
+      week, problem_doc, ground_truth, spec_folder, spec_doc, spec_data_folder, docker_container,
+      pr_link, blocker_reason, sonnet_pass_rate, opus_pass_rate,
+      separate_environment_init, taiga_tag, explainer_video, task_description, notes
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(problem_id, environment) DO UPDATE SET
       spec_number = excluded.spec_number,
       status = excluded.status,
       sme_id = excluded.sme_id,
+      feedback_id = excluded.feedback_id,
+      qa_id = excluded.qa_id,
       content_reviewer_id = excluded.content_reviewer_id,
       engineer_id = excluded.engineer_id,
       reviewer_id = excluded.reviewer_id,
+      final_reviewer_id = excluded.final_reviewer_id,
       week = excluded.week,
       problem_doc = excluded.problem_doc,
       ground_truth = excluded.ground_truth,
       spec_folder = excluded.spec_folder,
+      spec_doc = excluded.spec_doc,
+      spec_data_folder = excluded.spec_data_folder,
+      docker_container = excluded.docker_container,
       pr_link = excluded.pr_link,
       blocker_reason = excluded.blocker_reason,
       sonnet_pass_rate = excluded.sonnet_pass_rate,
       opus_pass_rate = excluded.opus_pass_rate,
+      separate_environment_init = excluded.separate_environment_init,
+      taiga_tag = excluded.taiga_tag,
+      explainer_video = excluded.explainer_video,
       task_description = excluded.task_description,
+      notes = excluded.notes,
       updated_at = CURRENT_TIMESTAMP
   `);
 
@@ -161,18 +172,28 @@ export function upsertProblem(problem: Partial<Problem> & { problemId: string; e
     problem.environment,
     problem.status ?? 'Unknown',
     problem.smeId ?? null,
+    problem.feedbackId ?? null,
+    problem.qaId ?? null,
     problem.contentReviewerId ?? null,
     problem.engineerId ?? null,
     problem.reviewerId ?? null,
+    problem.finalReviewerId ?? null,
     problem.week ?? null,
     problem.problemDoc ?? null,
     problem.groundTruth ?? null,
     problem.specFolder ?? null,
+    problem.specDoc ?? null,
+    problem.specDataFolder ?? null,
+    problem.dockerContainer ?? null,
     problem.prLink ?? null,
     problem.blockerReason ?? null,
     problem.sonnetPassRate ?? null,
     problem.opusPassRate ?? null,
-    problem.taskDescription ?? null
+    problem.separateEnvironmentInit ?? false,
+    problem.taigaTag ?? null,
+    problem.explainerVideo ?? null,
+    problem.taskDescription ?? null,
+    problem.notes ?? null
   );
 }
 

@@ -17,18 +17,28 @@ export interface Problem {
   environment: 'PE' | 'IB';
   status: ProblemStatus;
   smeId?: number;
+  feedbackId?: number;
+  qaId?: number;
   contentReviewerId?: number;
   engineerId?: number;
   reviewerId?: number;
+  finalReviewerId?: number;
   week?: number;
   problemDoc?: string;
   groundTruth?: string;
   specFolder?: string;
+  specDoc?: string;
+  specDataFolder?: string;
+  dockerContainer?: string;
   prLink?: string;
   blockerReason?: string;
   sonnetPassRate?: string;
   opusPassRate?: string;
+  separateEnvironmentInit?: boolean;
+  taigaTag?: string;
+  explainerVideo?: string;
   taskDescription?: string;
+  notes?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -45,7 +55,8 @@ export type ProblemStatus =
   | 'Feedback Given'
   | 'Blocked'
   | 'Taiga Testing'
-  | 'Ready for Taiga';
+  | 'Ready for Taiga'
+  | 'Make Harder';
 
 export interface TimeEntry {
   id: number;
@@ -117,18 +128,26 @@ export interface PEProblemRow {
   'ID': string;
   'Status': string;
   'SME': string;
-  'Content Reviewer': string;
+  'Feedback': string;
+  'QA': string;
   'Engineer': string;
-  'Reviewer': string;
+  'Final Reviewer': string;
   'Week': string;
   'Sonnet 4.5  Pass @ 10': string;
   'Opus 4.1 Pass @ 10': string;
+  'Separate Environment Init': string;
   'Problem Doc': string;
   'Problem Ground Truth': string;
   'Spec Folder': string;
+  'Spec Doc': string;
+  'Spec Data Folder': string;
+  'Docker Container': string;
   'PR Link': string;
   'Blocker Reason': string;
+  'Taiga Tag': string;
+  'Explainer Video': string;
   'Task Description': string;
+  'Notes': string;
 }
 
 export interface IBProblemRow {

@@ -130,9 +130,10 @@ export async function syncPEProblems(): Promise<{ synced: number; errors: string
     if (!id || !status || status.trim() === '') continue;
 
     const smeId = getOrCreateExpert(getValue('SME'));
-    const contentReviewerId = getOrCreateExpert(getValue('Content Reviewer'));
+    const feedbackId = getOrCreateExpert(getValue('Feedback'));
+    const qaId = getOrCreateExpert(getValue('QA'));
     const engineerId = getOrCreateExpert(getValue('Engineer'));
-    const reviewerId = getOrCreateExpert(getValue('Reviewer'));
+    const finalReviewerId = getOrCreateExpert(getValue('Final Reviewer'));
 
     upsertProblem({
       problemId: id,
@@ -140,18 +141,26 @@ export async function syncPEProblems(): Promise<{ synced: number; errors: string
       environment: 'PE',
       status: status as ProblemStatus,
       smeId,
-      contentReviewerId,
+      feedbackId,
+      qaId,
       engineerId,
-      reviewerId,
+      finalReviewerId,
       week: getValue('Week') ? parseInt(getValue('Week'), 10) : undefined,
       problemDoc: getValue('Problem Doc') || undefined,
       groundTruth: getValue('Problem Ground Truth') || getValue('Ground Truth') || undefined,
       specFolder: getValue('Spec Folder') || undefined,
+      specDoc: getValue('Spec Doc') || undefined,
+      specDataFolder: getValue('Spec Data Folder') || undefined,
+      dockerContainer: getValue('Docker Container') || undefined,
       prLink: getValue('PR Link') || undefined,
       blockerReason: getValue('Blocker Reason') || undefined,
       sonnetPassRate: getValue('Sonnet 4.5  Pass @ 10') || undefined,
       opusPassRate: getValue('Opus 4.1 Pass @ 10') || undefined,
+      separateEnvironmentInit: getValue('Separate Environment Init')?.toUpperCase() === 'TRUE',
+      taigaTag: getValue('Taiga Tag') || undefined,
+      explainerVideo: getValue('Explainer Video') || undefined,
       taskDescription: getValue('Task Description') || undefined,
+      notes: getValue('Notes') || undefined,
     });
 
     synced++;
@@ -200,9 +209,10 @@ export async function syncIBProblems(): Promise<{ synced: number; errors: string
     if (!id || !status || status.trim() === '') continue;
 
     const smeId = getOrCreateExpert(getValue('SME'));
-    const contentReviewerId = getOrCreateExpert(getValue('Content Reviewer'));
+    const feedbackId = getOrCreateExpert(getValue('Feedback'));
+    const qaId = getOrCreateExpert(getValue('QA'));
     const engineerId = getOrCreateExpert(getValue('Engineer'));
-    const reviewerId = getOrCreateExpert(getValue('Reviewer'));
+    const finalReviewerId = getOrCreateExpert(getValue('Final Reviewer'));
 
     upsertProblem({
       problemId: id,
@@ -210,17 +220,25 @@ export async function syncIBProblems(): Promise<{ synced: number; errors: string
       environment: 'IB',
       status: status as ProblemStatus,
       smeId,
-      contentReviewerId,
+      feedbackId,
+      qaId,
       engineerId,
-      reviewerId,
+      finalReviewerId,
       week: getValue('Week') ? parseInt(getValue('Week'), 10) : undefined,
       problemDoc: getValue('Problem Doc') || undefined,
       groundTruth: getValue('Ground Truth') || undefined,
       specFolder: getValue('Spec Folder') || undefined,
+      specDoc: getValue('Spec Doc') || undefined,
+      specDataFolder: getValue('Spec Data Folder') || undefined,
+      dockerContainer: getValue('Docker Container') || undefined,
       prLink: getValue('PR Link') || undefined,
       blockerReason: getValue('Blocker Reason') || undefined,
       sonnetPassRate: getValue('Taiga Score Pass @ 10') || undefined,
+      separateEnvironmentInit: getValue('Separate Environment Init')?.toUpperCase() === 'TRUE',
+      taigaTag: getValue('Taiga Tag') || undefined,
+      explainerVideo: getValue('Explainer Video') || undefined,
       taskDescription: getValue('Task Description') || undefined,
+      notes: getValue('Notes') || undefined,
     });
 
     synced++;
