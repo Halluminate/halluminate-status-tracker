@@ -240,12 +240,12 @@ export async function fetchAllSheets(): Promise<{ sheets: SheetData[], expertShe
     throw new Error('Google Sheet IDs not configured. Please set GOOGLE_SHEET_ID_PE and GOOGLE_SHEET_ID_IB in .env.local');
   }
 
-  // Fetch both status and expert data in parallel - increased range to 300 rows to get all data
+  // Fetch both status and expert data in parallel - increased range to 500 rows to get all data
   const [peData, ibData, peExpertData, ibExpertData] = await Promise.all([
-    fetchSheetData(peSheetId, 'A1:I300', 'PE'),
-    fetchSheetData(ibSheetId, 'A1:I300', 'IB'),
-    fetchExpertData(peSheetId, 'A1:I300', 'PE'),
-    fetchExpertData(ibSheetId, 'A1:I300', 'IB'),
+    fetchSheetData(peSheetId, 'A1:I500', 'PE'),
+    fetchSheetData(ibSheetId, 'A1:I500', 'IB'),
+    fetchExpertData(peSheetId, 'A1:I500', 'PE'),
+    fetchExpertData(ibSheetId, 'A1:I500', 'IB'),
   ]);
 
   return {
