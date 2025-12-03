@@ -25,8 +25,8 @@ function parseSheetData(values: any[][], sheetName: string): SheetData {
     return { name: sheetName, rows: [], grandTotal: 0 };
   }
 
-  // Expected columns: Spec #, ID, Status, SME, Content Reviewer, Engineer, Reviewer, Week, Score
-  // We need columns: Status (index 2) and Week (index 7)
+  // Expected columns: Spec #, ID, Status, SME, Feedback, QA, Engineer, Final Reviewer, Week, Score
+  // We need columns: Status (index 2) and Week (index 8)
 
   // Create a map to aggregate: { status: { week1: count, week2: count, ... } }
   const aggregation = new Map<string, { [key: string]: number }>();
@@ -34,10 +34,10 @@ function parseSheetData(values: any[][], sheetName: string): SheetData {
   // Skip header row (index 0), start from row 1
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
-    if (!row || row.length < 8) continue;
+    if (!row || row.length < 9) continue;
 
     const status = row[2]?.toString().trim();
-    const weekStr = row[7]?.toString().trim();
+    const weekStr = row[8]?.toString().trim();
 
     if (!status || !weekStr) continue;
 
@@ -103,8 +103,8 @@ function parseExpertData(values: any[][], sheetName: string): ExpertSheetData {
     return { name: sheetName, rows: [], grandTotal: 0 };
   }
 
-  // Expected columns: Spec #, ID, Status, SME, Content Reviewer, Engineer, Reviewer, Week, Score
-  // We need: Spec # (index 0) or ID (index 1) for uniqueness, SME (index 3), Week (index 7)
+  // Expected columns: Spec #, ID, Status, SME, Feedback, QA, Engineer, Final Reviewer, Week, Score
+  // We need: Spec # (index 0) or ID (index 1) for uniqueness, SME (index 3), Week (index 8)
 
   // Track which problems we've already counted for each SME to avoid double-counting
   const seenProblems = new Map<string, Set<string>>(); // SME -> Set of problem IDs
@@ -115,13 +115,13 @@ function parseExpertData(values: any[][], sheetName: string): ExpertSheetData {
   // Skip header row (index 0), start from row 1
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
-    if (!row || row.length < 8) continue;
+    if (!row || row.length < 9) continue;
 
     // Get problem identifier (use Spec # or ID, preferring ID if available)
     const problemId = (row[1]?.toString().trim() || row[0]?.toString().trim());
     if (!problemId) continue;
 
-    const weekStr = row[7]?.toString().trim();
+    const weekStr = row[8]?.toString().trim();
     if (!weekStr) continue;
 
     // Parse week number
