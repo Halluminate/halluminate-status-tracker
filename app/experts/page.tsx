@@ -219,7 +219,7 @@ export default function Home() {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Expert Management</h1>
-            <p className="text-gray-900 mt-1">TAIGA Problem Delivery Tracking</p>
+            <p className="text-gray-900 mt-1">Problem Delivery Tracking</p>
           </div>
           <div className="flex gap-3">
             <button

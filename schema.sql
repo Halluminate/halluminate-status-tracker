@@ -1,5 +1,5 @@
 -- Expert Management Database Schema
--- SQLite database for tracking TAIGA problem delivery and expert performance
+-- SQLite database for tracking problem delivery and expert performance
 
 -- Experts table - stores contractor information
 CREATE TABLE IF NOT EXISTS experts (

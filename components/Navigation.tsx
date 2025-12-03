@@ -17,7 +17,7 @@ export default function Navigation() {
     <nav className="bg-gray-900 text-white border-b-2 border-gray-800">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center justify-between h-14">
-          <div className="text-lg font-bold">TAIGA Project Management</div>
+          <div className="text-lg font-bold">Project Status Tracker</div>
 
           <div className="flex items-center gap-2">
             <Link

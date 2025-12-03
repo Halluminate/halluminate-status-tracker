@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TAIGA Project Management",
+  title: "Project Status Tracker",
   description: "Status tracking and expert performance management",
 };
 
