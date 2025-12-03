@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface ExpertSummary {
   id: number;
@@ -428,9 +428,8 @@ export default function Home() {
                   {sortedExperts.map((expert) => {
                     const isExpanded = expandedExpert === expert.id;
                     return (
-                      <>
+                      <React.Fragment key={expert.id}>
                         <tr
-                          key={expert.id}
                           className="hover:bg-gray-50 cursor-pointer"
                           onClick={() => handleExpertClick(expert.id)}
                         >
@@ -505,7 +504,7 @@ export default function Home() {
                             </td>
                           </tr>
                         )}
-                      </>
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
