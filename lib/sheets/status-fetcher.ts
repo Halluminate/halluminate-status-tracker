@@ -25,8 +25,15 @@ function parseSheetData(values: any[][], sheetName: string): SheetData {
     return { name: sheetName, rows: [], grandTotal: 0 };
   }
 
-  // Expected columns: Spec #, ID, Status, SME, Feedback, QA, Engineer, Final Reviewer, Week, Score
-  // We need columns: Status (index 2) and Week (index 8)
+  // Get column indices from headers
+  const headers = values[0];
+  const weekIndex = headers.findIndex((h: string) => h === 'Week');
+  const statusIndex = headers.findIndex((h: string) => h === 'Status');
+
+  if (weekIndex === -1 || statusIndex === -1) {
+    console.error('Could not find Week or Status columns in sheet:', sheetName);
+    return { name: sheetName, rows: [], grandTotal: 0 };
+  }
 
   // Create a map to aggregate: { status: { week1: count, week2: count, ... } }
   const aggregation = new Map<string, { [key: string]: number }>();
@@ -34,10 +41,10 @@ function parseSheetData(values: any[][], sheetName: string): SheetData {
   // Skip header row (index 0), start from row 1
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
-    if (!row || row.length < 9) continue;
+    if (!row || row.length < Math.max(weekIndex, statusIndex) + 1) continue;
 
-    const status = row[2]?.toString().trim();
-    const weekStr = row[8]?.toString().trim();
+    const status = row[statusIndex]?.toString().trim();
+    const weekStr = row[weekIndex]?.toString().trim();
 
     if (!status || !weekStr) continue;
 
@@ -103,8 +110,17 @@ function parseExpertData(values: any[][], sheetName: string): ExpertSheetData {
     return { name: sheetName, rows: [], grandTotal: 0 };
   }
 
-  // Expected columns: Spec #, ID, Status, SME, Feedback, QA, Engineer, Final Reviewer, Week, Score
-  // We need: Spec # (index 0) or ID (index 1) for uniqueness, SME (index 3), Week (index 8)
+  // Get column indices from headers
+  const headers = values[0];
+  const weekIndex = headers.findIndex((h: string) => h === 'Week');
+  const smeIndex = headers.findIndex((h: string) => h === 'SME');
+  const idIndex = headers.findIndex((h: string) => h === 'ID');
+  const specIndex = headers.findIndex((h: string) => h === 'Spec #' || h === 'Spec');
+
+  if (weekIndex === -1 || smeIndex === -1) {
+    console.error('Could not find Week or SME columns in sheet:', sheetName);
+    return { name: sheetName, rows: [], grandTotal: 0 };
+  }
 
   // Track which problems we've already counted for each SME to avoid double-counting
   const seenProblems = new Map<string, Set<string>>(); // SME -> Set of problem IDs
@@ -115,21 +131,22 @@ function parseExpertData(values: any[][], sheetName: string): ExpertSheetData {
   // Skip header row (index 0), start from row 1
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
-    if (!row || row.length < 9) continue;
+    if (!row || row.length < Math.max(weekIndex, smeIndex) + 1) continue;
 
-    // Get problem identifier (use Spec # or ID, preferring ID if available)
-    const problemId = (row[1]?.toString().trim() || row[0]?.toString().trim());
+    // Get problem identifier (use ID or Spec #, preferring ID if available)
+    const problemId = (idIndex !== -1 ? row[idIndex]?.toString().trim() : '') ||
+                      (specIndex !== -1 ? row[specIndex]?.toString().trim() : '');
     if (!problemId) continue;
 
-    const weekStr = row[8]?.toString().trim();
+    const weekStr = row[weekIndex]?.toString().trim();
     if (!weekStr) continue;
 
     // Parse week number
     const weekNum = parseInt(weekStr, 10);
     if (isNaN(weekNum) || weekNum < 1 || weekNum > 7) continue;
 
-    // Get only the SME (Subject Matter Expert) from column 3
-    const sme = row[3]?.toString().trim();
+    // Get only the SME (Subject Matter Expert)
+    const sme = row[smeIndex]?.toString().trim();
 
     if (!sme || sme.length === 0) continue;
 
