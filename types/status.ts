@@ -7,6 +7,7 @@ export interface StatusRow {
   week5: number;
   week6: number;
   week7: number;
+  weekNA: number;
   total: number;
 }
 
@@ -19,6 +20,7 @@ export interface ExpertRow {
   week5: number;
   week6: number;
   week7: number;
+  weekNA: number;
   total: number;
 }
 

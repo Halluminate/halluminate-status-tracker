@@ -41,16 +41,19 @@ function parseSheetData(values: any[][], sheetName: string): SheetData {
   // Skip header row (index 0), start from row 1
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
-    if (!row || row.length < Math.max(weekIndex, statusIndex) + 1) continue;
+    if (!row || row.length === 0) continue;
 
-    const status = row[statusIndex]?.toString().trim();
+    const status = row[statusIndex]?.toString().trim() || 'Not Set';
     const weekStr = row[weekIndex]?.toString().trim();
 
-    if (!status || !weekStr) continue;
-
-    // Parse week number
-    const weekNum = parseInt(weekStr, 10);
-    if (isNaN(weekNum) || weekNum < 1 || weekNum > 7) continue;
+    // Parse week number - if missing or invalid, use 'NA' week
+    let weekKey = 'weekNA';
+    if (weekStr) {
+      const weekNum = parseInt(weekStr, 10);
+      if (!isNaN(weekNum) && weekNum >= 1 && weekNum <= 7) {
+        weekKey = `week${weekNum}`;
+      }
+    }
 
     // Initialize status entry if it doesn't exist
     if (!aggregation.has(status)) {
@@ -62,12 +65,13 @@ function parseSheetData(values: any[][], sheetName: string): SheetData {
         week5: 0,
         week6: 0,
         week7: 0,
+        weekNA: 0,
       });
     }
 
     // Increment the count for this status and week
     const statusData = aggregation.get(status)!;
-    statusData[`week${weekNum}`] = (statusData[`week${weekNum}`] || 0) + 1;
+    statusData[weekKey] = (statusData[weekKey] || 0) + 1;
   }
 
   // Convert aggregation map to StatusRow array
@@ -82,7 +86,8 @@ function parseSheetData(values: any[][], sheetName: string): SheetData {
       weekCounts.week4 +
       weekCounts.week5 +
       weekCounts.week6 +
-      weekCounts.week7;
+      weekCounts.week7 +
+      (weekCounts.weekNA || 0);
 
     rows.push({
       status,
@@ -93,6 +98,7 @@ function parseSheetData(values: any[][], sheetName: string): SheetData {
       week5: weekCounts.week5,
       week6: weekCounts.week6,
       week7: weekCounts.week7,
+      weekNA: weekCounts.weekNA || 0,
       total,
     });
 
@@ -139,11 +145,15 @@ function parseExpertData(values: any[][], sheetName: string): ExpertSheetData {
     if (!problemId) continue;
 
     const weekStr = row[weekIndex]?.toString().trim();
-    if (!weekStr) continue;
 
-    // Parse week number
-    const weekNum = parseInt(weekStr, 10);
-    if (isNaN(weekNum) || weekNum < 1 || weekNum > 7) continue;
+    // Parse week number - if missing or invalid, use 'NA' week
+    let weekKey = 'weekNA';
+    if (weekStr) {
+      const weekNum = parseInt(weekStr, 10);
+      if (!isNaN(weekNum) && weekNum >= 1 && weekNum <= 7) {
+        weekKey = `week${weekNum}`;
+      }
+    }
 
     // Get only the SME (Subject Matter Expert)
     const sme = row[smeIndex]?.toString().trim();
@@ -174,12 +184,13 @@ function parseExpertData(values: any[][], sheetName: string): ExpertSheetData {
         week5: 0,
         week6: 0,
         week7: 0,
+        weekNA: 0,
       });
     }
 
     // Increment the count for this SME and week
     const expertData = aggregation.get(sme)!;
-    expertData[`week${weekNum}`] = (expertData[`week${weekNum}`] || 0) + 1;
+    expertData[weekKey] = (expertData[weekKey] || 0) + 1;
   }
 
   // Convert aggregation map to ExpertRow array
@@ -194,7 +205,8 @@ function parseExpertData(values: any[][], sheetName: string): ExpertSheetData {
       weekCounts.week4 +
       weekCounts.week5 +
       weekCounts.week6 +
-      weekCounts.week7;
+      weekCounts.week7 +
+      (weekCounts.weekNA || 0);
 
     rows.push({
       expert,
@@ -205,6 +217,7 @@ function parseExpertData(values: any[][], sheetName: string): ExpertSheetData {
       week5: weekCounts.week5,
       week6: weekCounts.week6,
       week7: weekCounts.week7,
+      weekNA: weekCounts.weekNA || 0,
       total,
     });
 

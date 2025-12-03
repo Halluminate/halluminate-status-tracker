@@ -57,6 +57,7 @@ export default function StatusTable({ data }: StatusTableProps) {
         existing.week5 += row.week5;
         existing.week6 += row.week6;
         existing.week7 += row.week7;
+        existing.weekNA += row.weekNA;
         existing.total += row.total;
       } else {
         // Add new entry
@@ -82,6 +83,7 @@ export default function StatusTable({ data }: StatusTableProps) {
       week5: sectionRows.reduce((sum, row) => sum + row.week5, 0),
       week6: sectionRows.reduce((sum, row) => sum + row.week6, 0),
       week7: sectionRows.reduce((sum, row) => sum + row.week7, 0),
+      weekNA: sectionRows.reduce((sum, row) => sum + row.weekNA, 0),
       total: sectionRows.reduce((sum, row) => sum + row.total, 0),
     };
 
@@ -89,7 +91,7 @@ export default function StatusTable({ data }: StatusTableProps) {
       <Fragment key={sectionName}>
         {/* Section Header */}
         <tr className="bg-gray-600">
-          <td colSpan={9} className="border border-gray-300 px-4 py-2 font-bold text-white">
+          <td colSpan={10} className="border border-gray-300 px-4 py-2 font-bold text-white">
             {sectionName}
           </td>
         </tr>
@@ -105,6 +107,7 @@ export default function StatusTable({ data }: StatusTableProps) {
             <td className="border border-gray-300 px-4 py-2 text-center text-black">{row.week5 || ''}</td>
             <td className="border border-gray-300 px-4 py-2 text-center text-black">{row.week6 || ''}</td>
             <td className="border border-gray-300 px-4 py-2 text-center text-black">{row.week7 || ''}</td>
+            <td className="border border-gray-300 px-4 py-2 text-center text-black">{row.weekNA || ''}</td>
             <td className="border border-gray-300 px-4 py-2 text-center font-bold bg-gray-100 text-black">{row.total}</td>
           </tr>
         ))}
@@ -119,6 +122,7 @@ export default function StatusTable({ data }: StatusTableProps) {
           <td className="border border-gray-300 px-4 py-2 text-center text-black">{subtotal.week5 || ''}</td>
           <td className="border border-gray-300 px-4 py-2 text-center text-black">{subtotal.week6 || ''}</td>
           <td className="border border-gray-300 px-4 py-2 text-center text-black">{subtotal.week7 || ''}</td>
+          <td className="border border-gray-300 px-4 py-2 text-center text-black">{subtotal.weekNA || ''}</td>
           <td className="border border-gray-300 px-4 py-2 text-center bg-gray-400 text-black">{subtotal.total}</td>
         </tr>
       </Fragment>
@@ -134,6 +138,7 @@ export default function StatusTable({ data }: StatusTableProps) {
     week5: Array.from(statusMap.values()).reduce((sum, row) => sum + row.week5, 0),
     week6: Array.from(statusMap.values()).reduce((sum, row) => sum + row.week6, 0),
     week7: Array.from(statusMap.values()).reduce((sum, row) => sum + row.week7, 0),
+    weekNA: Array.from(statusMap.values()).reduce((sum, row) => sum + row.weekNA, 0),
     total: Array.from(statusMap.values()).reduce((sum, row) => sum + row.total, 0),
   };
 
@@ -150,6 +155,7 @@ export default function StatusTable({ data }: StatusTableProps) {
             <th className="border border-gray-300 px-4 py-3 text-center font-semibold">Week 5</th>
             <th className="border border-gray-300 px-4 py-3 text-center font-semibold">Week 6</th>
             <th className="border border-gray-300 px-4 py-3 text-center font-semibold">Week 7</th>
+            <th className="border border-gray-300 px-4 py-3 text-center font-semibold">Week NA</th>
             <th className="border border-gray-300 px-4 py-3 text-center font-semibold bg-gray-900">Total</th>
           </tr>
         </thead>
@@ -168,6 +174,7 @@ export default function StatusTable({ data }: StatusTableProps) {
             <td className="border border-gray-300 px-4 py-3 text-center">{grandTotal.week5}</td>
             <td className="border border-gray-300 px-4 py-3 text-center">{grandTotal.week6}</td>
             <td className="border border-gray-300 px-4 py-3 text-center">{grandTotal.week7}</td>
+            <td className="border border-gray-300 px-4 py-3 text-center">{grandTotal.weekNA}</td>
             <td className="border border-gray-300 px-4 py-3 text-center bg-gray-900">{grandTotal.total}</td>
           </tr>
         </tbody>

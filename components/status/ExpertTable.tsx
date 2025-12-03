@@ -7,7 +7,7 @@ interface ExpertTableProps {
   data: ExpertSheetData[];
 }
 
-type SortField = 'expert' | 'week1' | 'week2' | 'week3' | 'week4' | 'week5' | 'week6' | 'week7' | 'total';
+type SortField = 'expert' | 'week1' | 'week2' | 'week3' | 'week4' | 'week5' | 'week6' | 'week7' | 'weekNA' | 'total';
 
 export default function ExpertTable({ data }: ExpertTableProps) {
   const [sortField, setSortField] = useState<SortField>('expert');
@@ -36,6 +36,7 @@ export default function ExpertTable({ data }: ExpertTableProps) {
         existing.week5 += row.week5;
         existing.week6 += row.week6;
         existing.week7 += row.week7;
+        existing.weekNA += row.weekNA;
         existing.total += row.total;
       } else {
         // Add new entry
@@ -87,6 +88,7 @@ export default function ExpertTable({ data }: ExpertTableProps) {
     week5: experts.reduce((sum, row) => sum + row.week5, 0),
     week6: experts.reduce((sum, row) => sum + row.week6, 0),
     week7: experts.reduce((sum, row) => sum + row.week7, 0),
+    weekNA: experts.reduce((sum, row) => sum + row.weekNA, 0),
     total: experts.reduce((sum, row) => sum + row.total, 0),
   };
 
@@ -149,6 +151,12 @@ export default function ExpertTable({ data }: ExpertTableProps) {
               Week 7 {getSortIcon('week7')}
             </th>
             <th
+              className="border border-gray-300 px-4 py-3 text-center font-semibold cursor-pointer hover:bg-gray-700"
+              onClick={() => handleSort('weekNA')}
+            >
+              Week NA {getSortIcon('weekNA')}
+            </th>
+            <th
               className="border border-gray-300 px-4 py-3 text-center font-semibold bg-gray-900 cursor-pointer hover:bg-gray-800"
               onClick={() => handleSort('total')}
             >
@@ -168,6 +176,7 @@ export default function ExpertTable({ data }: ExpertTableProps) {
               <td className={`border border-gray-300 px-4 py-2 text-center text-black ${getCellClass(row.week5)}`}>{row.week5 || ''}</td>
               <td className={`border border-gray-300 px-4 py-2 text-center text-black ${getCellClass(row.week6)}`}>{row.week6 || ''}</td>
               <td className={`border border-gray-300 px-4 py-2 text-center text-black ${getCellClass(row.week7)}`}>{row.week7 || ''}</td>
+              <td className={`border border-gray-300 px-4 py-2 text-center text-black ${getCellClass(row.weekNA)}`}>{row.weekNA || ''}</td>
               <td className="border border-gray-300 px-4 py-2 text-center font-bold bg-gray-100 text-black">{row.total}</td>
             </tr>
           ))}
@@ -182,6 +191,7 @@ export default function ExpertTable({ data }: ExpertTableProps) {
             <td className="border border-gray-300 px-4 py-3 text-center">{grandTotal.week5}</td>
             <td className="border border-gray-300 px-4 py-3 text-center">{grandTotal.week6}</td>
             <td className="border border-gray-300 px-4 py-3 text-center">{grandTotal.week7}</td>
+            <td className="border border-gray-300 px-4 py-3 text-center">{grandTotal.weekNA}</td>
             <td className="border border-gray-300 px-4 py-3 text-center bg-gray-900">{grandTotal.total}</td>
           </tr>
         </tbody>
