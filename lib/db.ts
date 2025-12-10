@@ -319,6 +319,91 @@ export function getExpertProblemBreakdown(expertId: number): Record<string, numb
   }, {} as Record<string, number>);
 }
 
+// Get expert problems breakdown by week
+export function getExpertWeeklyBreakdown(expertId: number): { week: number | null; count: number; statuses: Record<string, number> }[] {
+  const db = getDb();
+
+  // Get counts by week
+  const weekCounts = db.prepare(`
+    SELECT
+      week,
+      COUNT(*) as count
+    FROM problems
+    WHERE sme_id = ? OR engineer_id = ? OR reviewer_id = ? OR content_reviewer_id = ?
+    GROUP BY week
+    ORDER BY
+      CASE WHEN week IS NULL THEN 999 ELSE week END
+  `).all(expertId, expertId, expertId, expertId) as { week: number | null; count: number }[];
+
+  // Get status breakdown by week
+  const statusByWeek = db.prepare(`
+    SELECT
+      week,
+      status,
+      COUNT(*) as count
+    FROM problems
+    WHERE sme_id = ? OR engineer_id = ? OR reviewer_id = ? OR content_reviewer_id = ?
+    GROUP BY week, status
+    ORDER BY week, status
+  `).all(expertId, expertId, expertId, expertId) as { week: number | null; status: string; count: number }[];
+
+  // Combine the data
+  const statusMap = new Map<number | null, Record<string, number>>();
+  for (const row of statusByWeek) {
+    const weekKey = row.week;
+    if (!statusMap.has(weekKey)) {
+      statusMap.set(weekKey, {});
+    }
+    statusMap.get(weekKey)![row.status] = row.count;
+  }
+
+  return weekCounts.map(wc => ({
+    week: wc.week,
+    count: wc.count,
+    statuses: statusMap.get(wc.week) || {}
+  }));
+}
+
+// Get detailed expert stats including problems list
+export function getExpertDetailedStats(expertId: number) {
+  const db = getDb();
+  const expert = getExpertById(expertId);
+  if (!expert) return null;
+
+  const summary = getExpertSummaryById(expertId);
+  const weeklyBreakdown = getExpertWeeklyBreakdown(expertId);
+  const statusBreakdown = getExpertProblemBreakdown(expertId);
+
+  // Get all problems for this expert with details
+  const problems = db.prepare(`
+    SELECT
+      p.*,
+      sme.name as sme_name,
+      eng.name as engineer_name,
+      rev.name as reviewer_name,
+      cr.name as content_reviewer_name
+    FROM problems p
+    LEFT JOIN experts sme ON p.sme_id = sme.id
+    LEFT JOIN experts eng ON p.engineer_id = eng.id
+    LEFT JOIN experts rev ON p.reviewer_id = rev.id
+    LEFT JOIN experts cr ON p.content_reviewer_id = cr.id
+    WHERE p.sme_id = ? OR p.engineer_id = ? OR p.reviewer_id = ? OR p.content_reviewer_id = ?
+    ORDER BY p.week, p.environment, p.spec_number, p.problem_id
+  `).all(expertId, expertId, expertId, expertId);
+
+  // Get time entries
+  const timeEntries = getTimeEntriesByExpert(expertId);
+
+  return {
+    expert,
+    summary,
+    weeklyBreakdown,
+    statusBreakdown,
+    problems,
+    timeEntries
+  };
+}
+
 // Get total unique problem counts for summary
 export function getProblemTotals(): { totalProblems: number; inProgress: number; delivered: number } {
   const db = getDb();

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 
 interface ExpertSummary {
   id: number;
@@ -438,7 +439,13 @@ export default function Home() {
                               <span className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
                                 ▶
                               </span>
-                              <div className="font-medium text-gray-900">{expert.name}</div>
+                              <Link
+                                href={`/experts/${expert.id}`}
+                                className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {expert.name}
+                              </Link>
                             </div>
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-gray-500">
