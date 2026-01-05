@@ -50,6 +50,16 @@ export default function Navigation() {
             >
               Expert Management
             </Link>
+            <Link
+              href="/bonuses"
+              className={`px-4 py-2 rounded transition-colors ${
+                pathname === '/bonuses'
+                  ? 'bg-white text-gray-900 font-semibold'
+                  : 'hover:bg-gray-800'
+              }`}
+            >
+              Bonuses
+            </Link>
             <button
               onClick={handleLogout}
               className="px-4 py-2 rounded transition-colors hover:bg-red-600 ml-4"
