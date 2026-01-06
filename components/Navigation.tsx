@@ -31,19 +31,9 @@ export default function Navigation() {
               Status Tracker
             </Link>
             <Link
-              href="/catalog"
-              className={`px-4 py-2 rounded transition-colors ${
-                pathname === '/catalog'
-                  ? 'bg-white text-gray-900 font-semibold'
-                  : 'hover:bg-gray-800'
-              }`}
-            >
-              Problem Catalog
-            </Link>
-            <Link
               href="/experts"
               className={`px-4 py-2 rounded transition-colors ${
-                pathname === '/experts'
+                pathname === '/experts' || pathname?.startsWith('/experts/')
                   ? 'bg-white text-gray-900 font-semibold'
                   : 'hover:bg-gray-800'
               }`}
