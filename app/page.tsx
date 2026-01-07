@@ -3,8 +3,11 @@
 import { useEffect, useState } from 'react';
 import StatusTable from '@/components/status/StatusTable';
 import ExpertTable from '@/components/status/ExpertTable';
-import SummaryStats from '@/components/status/SummaryStats';
+import KPICards from '@/components/status/KPICards';
 import { CombinedData } from '@/types/status';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { RefreshCw, AlertCircle } from 'lucide-react';
 
 export default function Home() {
   const [data, setData] = useState<CombinedData | null>(null);
@@ -47,100 +50,103 @@ export default function Home() {
   } : null;
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Problem Management</h1>
+            <h1 className="text-3xl font-bold text-foreground">Problem Management</h1>
             {data && (
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 Last updated: {new Date(data.lastUpdated).toLocaleString()}
               </p>
             )}
           </div>
-          <div className="flex gap-4 items-center">
+          <div className="flex gap-3 items-center">
             {/* Filter Dropdown */}
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value as 'All' | 'PE' | 'IB')}
-              className="px-4 py-2 border-2 border-gray-800 rounded-lg bg-white text-black font-medium focus:outline-none focus:ring-2 focus:ring-gray-600"
+              className="px-4 py-2 border border-input rounded-md bg-background text-foreground font-medium focus:outline-none focus:ring-2 focus:ring-ring"
             >
               <option value="All">All</option>
               <option value="PE">PE</option>
               <option value="IB">IB</option>
             </select>
-            <button
+            <Button
               onClick={fetchData}
               disabled={loading}
-              className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium"
+              className="gap-2"
             >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               {loading ? 'Refreshing...' : 'Refresh'}
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Loading State */}
         {loading && !data && (
           <div className="flex items-center justify-center py-12">
-            <div className="text-lg text-gray-600">Loading data...</div>
+            <div className="text-lg text-muted-foreground">Loading data...</div>
           </div>
         )}
 
         {/* Error State */}
         {error && (
-          <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 mb-8">
-            <h3 className="text-red-800 font-semibold mb-2">Error loading data</h3>
-            <p className="text-red-600">{error}</p>
-            <p className="text-sm text-red-500 mt-2">
-              Make sure you have configured the Google Sheets API credentials in .env.local
-            </p>
-          </div>
+          <Card className="border-destructive mb-8">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-destructive flex items-center gap-2">
+                <AlertCircle className="h-5 w-5" />
+                Error loading data
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-destructive/80">{error}</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Make sure you have configured the Google Sheets API credentials in .env.local
+              </p>
+            </CardContent>
+          </Card>
         )}
 
         {/* Dashboard Content */}
         {filteredData && !loading && (
           <>
-            <SummaryStats data={filteredData.sheets} />
+            <KPICards data={filteredData.sheets} />
 
             {/* View Toggle */}
             <div className="mb-6 flex gap-2">
-              <button
+              <Button
                 onClick={() => setView('weekly')}
-                className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                  view === 'weekly'
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
+                variant={view === 'weekly' ? 'default' : 'secondary'}
+                className="px-6"
               >
                 Weekly Progress View
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => setView('expert')}
-                className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                  view === 'expert'
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
+                variant={view === 'expert' ? 'default' : 'secondary'}
+                className="px-6"
               >
                 Expert View
-              </button>
+              </Button>
             </div>
 
             {/* Content based on view */}
-            <div className="bg-white border-2 border-gray-800 rounded-lg p-6">
-              {view === 'weekly' ? (
-                <>
-                  <h2 className="text-xl font-bold text-black mb-4">Weekly Progress Overview</h2>
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  {view === 'weekly' ? 'Weekly Progress Overview' : 'Expert Overview'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {view === 'weekly' ? (
                   <StatusTable data={filteredData.sheets} />
-                </>
-              ) : (
-                <>
-                  <h2 className="text-xl font-bold text-black mb-4">Expert Overview</h2>
+                ) : (
                   <ExpertTable data={filteredData.expertSheets} />
-                </>
-              )}
-            </div>
+                )}
+              </CardContent>
+            </Card>
           </>
         )}
       </div>
