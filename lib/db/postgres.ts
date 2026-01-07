@@ -13,12 +13,20 @@ export function getPool(): Pool {
       throw new Error('DATABASE_URL environment variable is not set');
     }
 
+    // Determine SSL config based on environment
+    // For Vercel/production, we need SSL but can't verify RDS self-signed certs
+    const sslConfig = process.env.VERCEL || process.env.NODE_ENV === 'production'
+      ? {
+          rejectUnauthorized: false,
+          // Don't require specific cert - RDS uses Amazon's root CA
+        }
+      : false;
+
     pool = new Pool({
       connectionString,
-      // Always use SSL for RDS connections
-      ssl: { rejectUnauthorized: false },
-      max: 10,
-      idleTimeoutMillis: 30000,
+      ssl: sslConfig,
+      max: 5, // Lower for serverless
+      idleTimeoutMillis: 10000,
       connectionTimeoutMillis: 10000,
     });
 
