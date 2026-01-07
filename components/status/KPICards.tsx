@@ -27,14 +27,12 @@ export default function KPICards({ data }: KPICardsProps) {
     });
   });
 
-  // Key metrics
+  // Key metrics - using Horizon status names
   const delivered = statusTotals.get('Delivered') || 0;
-  const inQA = statusTotals.get('QA') || 0;
-  const qaIssues = statusTotals.get('QA Issues') || 0;
+  const inReview = (statusTotals.get('Review 1') || 0) + (statusTotals.get('Review 2') || 0);
+  const preDelivery = (statusTotals.get('Ready for Delivery') || 0) + (statusTotals.get('Trajectory Testing') || 0);
   const blocked = statusTotals.get('Blocked') || 0;
-  const inProgress = (statusTotals.get('Problem Writeup') || 0) +
-                     (statusTotals.get('Problem Feedback') || 0) +
-                     (statusTotals.get('Problem QA') || 0);
+  const inProgress = statusTotals.get('In-Progress') || 0;
 
   // Calculate week-over-week trends (week7 vs week6)
   const getWeekTrend = (status: string) => {
@@ -55,7 +53,6 @@ export default function KPICards({ data }: KPICardsProps) {
   };
 
   const deliveredTrend = getWeekTrend('Delivered');
-  const qaTrend = getWeekTrend('QA');
 
   const TrendBadge = ({ change, trend, inverse = false }: { change: number; trend: 'up' | 'down' | 'neutral'; inverse?: boolean }) => {
     const isPositive = inverse ? trend === 'down' : trend === 'up';
@@ -117,39 +114,38 @@ export default function KPICards({ data }: KPICardsProps) {
         </CardContent>
       </Card>
 
-      {/* In QA Pipeline */}
+      {/* In Review */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">In QA Pipeline</CardTitle>
+          <CardTitle className="text-sm font-medium">In Review</CardTitle>
           <Clock className="h-4 w-4 text-blue-600" />
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-bold text-blue-600">{inQA}</div>
-          <div className="flex items-center gap-2 mt-2">
-            <TrendBadge {...qaTrend} />
-            <span className="text-xs text-muted-foreground">vs last week</span>
+          <div className="text-3xl font-bold text-blue-600">{inReview}</div>
+          <div className="flex items-center gap-4 mt-2">
+            <span className="text-xs text-muted-foreground">
+              In Progress: <span className="font-semibold text-foreground">{inProgress}</span>
+            </span>
+            <span className="text-xs text-muted-foreground">
+              Pre-Delivery: <span className="font-semibold text-foreground">{preDelivery}</span>
+            </span>
           </div>
         </CardContent>
       </Card>
 
-      {/* Issues & Blocked */}
+      {/* Blocked */}
       <Card className={blocked > 0 ? 'border-destructive' : ''}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Needs Attention</CardTitle>
+          <CardTitle className="text-sm font-medium">Blocked</CardTitle>
           <AlertCircle className={`h-4 w-4 ${blocked > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
         </CardHeader>
         <CardContent>
           <div className={`text-3xl font-bold ${blocked > 0 ? 'text-destructive' : ''}`}>
-            {qaIssues + blocked}
+            {blocked}
           </div>
-          <div className="flex items-center gap-4 mt-2">
-            <span className="text-xs text-muted-foreground">
-              QA Issues: <span className="font-semibold text-foreground">{qaIssues}</span>
-            </span>
-            <span className="text-xs text-muted-foreground">
-              Blocked: <span className={`font-semibold ${blocked > 0 ? 'text-destructive' : 'text-foreground'}`}>{blocked}</span>
-            </span>
-          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Problems requiring attention
+          </p>
         </CardContent>
       </Card>
     </div>
