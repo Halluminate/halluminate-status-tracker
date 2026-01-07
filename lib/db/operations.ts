@@ -45,6 +45,55 @@ export async function upsertExpert(expert: Partial<Expert> & { name: string }): 
   return result!;
 }
 
+// Create/update expert from Rippling employee data
+export async function upsertExpertFromRippling(employeeName: string, hourlyRate?: number): Promise<Expert> {
+  const result = await queryOne<Expert>(`
+    INSERT INTO experts (name, hourly_rate, source, is_active)
+    VALUES ($1, $2, 'rippling', true)
+    ON CONFLICT (name) DO UPDATE SET
+      hourly_rate = COALESCE($2, experts.hourly_rate),
+      source = COALESCE(experts.source, 'rippling'),
+      is_active = true,
+      updated_at = NOW()
+    RETURNING *
+  `, [employeeName, hourlyRate ?? 150]);
+
+  return result!;
+}
+
+// Link a Horizon user to an expert (by matching names or manual linking)
+export async function linkHorizonUserToExpert(expertId: number, horizonUserId: string): Promise<void> {
+  await query(`
+    UPDATE experts SET horizon_user_id = $2, updated_at = NOW()
+    WHERE id = $1
+  `, [expertId, horizonUserId]);
+}
+
+// Auto-match Horizon users to experts by name
+export async function autoMatchHorizonUsers(horizonUsers: { id: string; firstName: string; lastName: string }[]): Promise<{ matched: number; unmatched: string[] }> {
+  let matched = 0;
+  const unmatched: string[] = [];
+
+  for (const user of horizonUsers) {
+    const fullName = `${user.firstName} ${user.lastName}`;
+    const horizonUserId = `${user.firstName.toLowerCase()}-${user.lastName.toLowerCase()}`;
+
+    // Try to find expert with matching name
+    const expert = await queryOne<Expert>(`
+      SELECT * FROM experts WHERE LOWER(name) = LOWER($1)
+    `, [fullName]);
+
+    if (expert) {
+      await linkHorizonUserToExpert(expert.id, horizonUserId);
+      matched++;
+    } else {
+      unmatched.push(fullName);
+    }
+  }
+
+  return { matched, unmatched };
+}
+
 // ============================================
 // EXPERT SUMMARY QUERIES
 // ============================================
@@ -59,27 +108,30 @@ export async function getExpertSummaries(): Promise<ExpertSummary[]> {
       e.id,
       e.name,
       e.hourly_rate as "hourlyRate",
+      e.horizon_user_id as "horizonUserId",
+      e.source,
+      e.is_active as "isActive",
       COUNT(DISTINCT CASE WHEN p.status IN ('Problem Writeup', 'Problem Feedback', 'Problem QA', 'Feedback Requested') THEN p.id END) as "problemsInProgress",
       COUNT(DISTINCT CASE WHEN p.status NOT IN ('Problem Writeup', 'Problem Feedback', 'Problem QA', 'Feedback Requested') THEN p.id END) as "problemsDelivered",
       COUNT(DISTINCT p.id) as "totalProblemsAssigned",
-      COALESCE((SELECT SUM(hours_worked) FROM time_entries WHERE expert_id = e.id), 0) as "totalHours",
-      COALESCE((SELECT SUM(hours_worked) FROM time_entries WHERE expert_id = e.id), 0) * e.hourly_rate as "totalCost",
+      COALESCE((SELECT SUM(hours_regular) FROM timecards WHERE expert_id = e.id), 0) as "totalHours",
+      COALESCE((SELECT SUM(hours_regular) FROM timecards WHERE expert_id = e.id), 0) * e.hourly_rate as "totalCost",
       CASE
         WHEN COUNT(DISTINCT p.id) > 0
-        THEN (COALESCE((SELECT SUM(hours_worked) FROM time_entries WHERE expert_id = e.id), 0) * e.hourly_rate) / COUNT(DISTINCT p.id)
+        THEN (COALESCE((SELECT SUM(hours_regular) FROM timecards WHERE expert_id = e.id), 0) * e.hourly_rate) / COUNT(DISTINCT p.id)
         ELSE NULL
       END as "costPerAssigned",
       CASE
         WHEN COUNT(DISTINCT CASE WHEN p.status NOT IN ('Problem Writeup', 'Problem Feedback', 'Problem QA', 'Feedback Requested') THEN p.id END) > 0
-        THEN (COALESCE((SELECT SUM(hours_worked) FROM time_entries WHERE expert_id = e.id), 0) * e.hourly_rate) / COUNT(DISTINCT CASE WHEN p.status NOT IN ('Problem Writeup', 'Problem Feedback', 'Problem QA', 'Feedback Requested') THEN p.id END)
+        THEN (COALESCE((SELECT SUM(hours_regular) FROM timecards WHERE expert_id = e.id), 0) * e.hourly_rate) / COUNT(DISTINCT CASE WHEN p.status NOT IN ('Problem Writeup', 'Problem Feedback', 'Problem QA', 'Feedback Requested') THEN p.id END)
         ELSE NULL
       END as "costPerDelivered"
     FROM experts e
     LEFT JOIN problems p ON e.id IN (p.sme_id, p.engineer_id, p.reviewer_id, p.content_reviewer_id)
     WHERE e.name NOT IN (${excludePlaceholders})
+      AND COALESCE(e.is_active, true) = true
     GROUP BY e.id
-    HAVING COUNT(DISTINCT p.id) > 0 OR COALESCE((SELECT SUM(hours_worked) FROM time_entries WHERE expert_id = e.id), 0) > 0
-    ORDER BY "totalCost" DESC
+    ORDER BY "totalHours" DESC NULLS LAST, e.name
   `, EXCLUDED_NAMES);
 }
 
@@ -191,8 +243,18 @@ export async function upsertProblem(problem: Partial<Problem> & { problemId: str
 }
 
 // ============================================
-// BONUS OPERATIONS (7-Category Structure)
+// BONUS OPERATIONS (Pay Period Based)
 // ============================================
+
+export interface PayPeriod {
+  id: number;
+  periodName: string;
+  periodStart: Date;
+  periodEnd: Date;
+  isPaid: boolean;
+  paidDate: Date | null;
+  notes: string | null;
+}
 
 export async function getBonusParameters(): Promise<BonusParameters> {
   const rows = await query<{ parameter_name: string; parameter_value: number }>(
@@ -202,10 +264,10 @@ export async function getBonusParameters(): Promise<BonusParameters> {
   const params: BonusParameters = {
     writerPerProblem: 100,
     review1PerProblem: 50,
-    review2PerProblem: 50,
+    review2PerProblem: 30,
     hoursPercentRate: 0.20,
     referralBonusAmount: 300,
-    defaultDataFilePrice: 200,
+    defaultDataFilePrice: 50,
   };
 
   for (const row of rows) {
@@ -220,6 +282,46 @@ export async function getBonusParameters(): Promise<BonusParameters> {
   }
 
   return params;
+}
+
+export async function getAllPayPeriods(): Promise<PayPeriod[]> {
+  return query<PayPeriod>(`
+    SELECT
+      id,
+      period_name as "periodName",
+      period_start as "periodStart",
+      period_end as "periodEnd",
+      is_paid as "isPaid",
+      paid_date as "paidDate",
+      notes
+    FROM pay_periods
+    ORDER BY period_start DESC
+  `);
+}
+
+export async function getPayPeriodById(id: number): Promise<PayPeriod | null> {
+  return queryOne<PayPeriod>(`
+    SELECT
+      id,
+      period_name as "periodName",
+      period_start as "periodStart",
+      period_end as "periodEnd",
+      is_paid as "isPaid",
+      paid_date as "paidDate",
+      notes
+    FROM pay_periods
+    WHERE id = $1
+  `, [id]);
+}
+
+export async function createPayPeriod(periodName: string, periodStart: Date, periodEnd: Date): Promise<PayPeriod> {
+  const result = await queryOne<PayPeriod>(`
+    INSERT INTO pay_periods (period_name, period_start, period_end)
+    VALUES ($1, $2, $3)
+    ON CONFLICT (period_start, period_end) DO UPDATE SET period_name = EXCLUDED.period_name
+    RETURNING id, period_name as "periodName", period_start as "periodStart", period_end as "periodEnd", is_paid as "isPaid", paid_date as "paidDate", notes
+  `, [periodName, periodStart, periodEnd]);
+  return result!;
 }
 
 export async function getExpertBonusConfig(expertId: number): Promise<ExpertBonusConfig | null> {
@@ -241,113 +343,99 @@ export async function getExpertBonusConfig(expertId: number): Promise<ExpertBonu
   `, [expertId]);
 }
 
-export async function upsertWeeklyBonusInput(input: Partial<WeeklyBonusInput> & { expertId: number; periodStart: Date; periodEnd: Date }): Promise<void> {
+export async function upsertWeeklyBonusInput(input: {
+  expertId: number;
+  periodId: number;
+  totalHours?: number;
+  hourlyRate?: number;
+  writerQualifyingProblems?: number;
+  review1QualifyingProblems?: number;
+  review2QualifyingProblems?: number;
+  is20PercentEligible?: boolean;
+  hoursAtOldSalary?: number;
+  oldHourlyRate?: number;
+  newHourlyRate?: number;
+  initialReferralCount?: number;
+  dataFilesCount?: number;
+}): Promise<void> {
   await query(`
     INSERT INTO weekly_bonus_input (
-      expert_id, period_name, period_start, period_end,
-      writer_qualifying_problems, writer_per_problem_rate,
-      review1_qualifying_problems, review1_per_problem_rate,
-      review2_qualifying_problems, review2_per_problem_rate,
-      total_hours, hourly_rate, percent_bonus_rate,
-      hours_at_old_salary, old_hourly_rate, new_hourly_rate,
-      initial_referral_count, referral_bonus_amount,
-      data_files_count, price_per_data_file
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
-    ON CONFLICT (expert_id, period_start, period_end) DO UPDATE SET
-      period_name = EXCLUDED.period_name,
-      writer_qualifying_problems = EXCLUDED.writer_qualifying_problems,
-      writer_per_problem_rate = EXCLUDED.writer_per_problem_rate,
-      review1_qualifying_problems = EXCLUDED.review1_qualifying_problems,
-      review1_per_problem_rate = EXCLUDED.review1_per_problem_rate,
-      review2_qualifying_problems = EXCLUDED.review2_qualifying_problems,
-      review2_per_problem_rate = EXCLUDED.review2_per_problem_rate,
+      expert_id, period_id, total_hours, hourly_rate,
+      writer_qualifying_problems, review1_qualifying_problems, review2_qualifying_problems,
+      is_20_percent_eligible, hours_at_old_salary, old_hourly_rate, new_hourly_rate,
+      initial_referral_count, data_files_count
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    ON CONFLICT (expert_id, period_id) DO UPDATE SET
       total_hours = EXCLUDED.total_hours,
       hourly_rate = EXCLUDED.hourly_rate,
-      percent_bonus_rate = EXCLUDED.percent_bonus_rate,
+      writer_qualifying_problems = EXCLUDED.writer_qualifying_problems,
+      review1_qualifying_problems = EXCLUDED.review1_qualifying_problems,
+      review2_qualifying_problems = EXCLUDED.review2_qualifying_problems,
+      is_20_percent_eligible = EXCLUDED.is_20_percent_eligible,
       hours_at_old_salary = EXCLUDED.hours_at_old_salary,
       old_hourly_rate = EXCLUDED.old_hourly_rate,
       new_hourly_rate = EXCLUDED.new_hourly_rate,
       initial_referral_count = EXCLUDED.initial_referral_count,
-      referral_bonus_amount = EXCLUDED.referral_bonus_amount,
       data_files_count = EXCLUDED.data_files_count,
-      price_per_data_file = EXCLUDED.price_per_data_file,
       updated_at = NOW()
   `, [
     input.expertId,
-    input.periodName ?? '',
-    input.periodStart,
-    input.periodEnd,
-    input.writerQualifyingProblems ?? 0,
-    input.writerPerProblemRate ?? 100,
-    input.review1QualifyingProblems ?? 0,
-    input.review1PerProblemRate ?? 50,
-    input.review2QualifyingProblems ?? 0,
-    input.review2PerProblemRate ?? 50,
+    input.periodId,
     input.totalHours ?? 0,
     input.hourlyRate ?? 150,
-    input.percentBonusRate ?? 0.20,
+    input.writerQualifyingProblems ?? 0,
+    input.review1QualifyingProblems ?? 0,
+    input.review2QualifyingProblems ?? 0,
+    input.is20PercentEligible ?? false,
     input.hoursAtOldSalary ?? 0,
     input.oldHourlyRate ?? null,
     input.newHourlyRate ?? null,
     input.initialReferralCount ?? 0,
-    input.referralBonusAmount ?? 300,
     input.dataFilesCount ?? 0,
-    input.pricePerDataFile ?? 200,
   ]);
 }
 
-export async function calculateAndSaveBonus(expertId: number, periodStart: Date, periodEnd: Date): Promise<WeeklyBonusCalculation | null> {
+export async function calculateAndSaveBonus(expertId: number, periodId: number): Promise<WeeklyBonusCalculation | null> {
   // Get input data
   const input = await queryOne<any>(`
-    SELECT * FROM weekly_bonus_input WHERE expert_id = $1 AND period_start = $2 AND period_end = $3
-  `, [expertId, periodStart, periodEnd]);
+    SELECT * FROM weekly_bonus_input WHERE expert_id = $1 AND period_id = $2
+  `, [expertId, periodId]);
 
   if (!input) return null;
 
-  // Get expert config for 20% eligibility
-  const config = await getExpertBonusConfig(expertId);
+  // Get bonus parameters
+  const params = await getBonusParameters();
 
   // Calculate each bonus type
-  // 1. Writer Bonus: qualifying problems × rate
-  const writerBonus = (input.writer_qualifying_problems || 0) * (input.writer_per_problem_rate || 100);
+  const writerBonus = (input.writer_qualifying_problems || 0) * params.writerPerProblem;
+  const review1Bonus = (input.review1_qualifying_problems || 0) * params.review1PerProblem;
+  const review2Bonus = (input.review2_qualifying_problems || 0) * params.review2PerProblem;
 
-  // 2. Review 1 Bonus: qualifying problems × rate
-  const review1Bonus = (input.review1_qualifying_problems || 0) * (input.review1_per_problem_rate || 50);
-
-  // 3. Review 2 Bonus: qualifying problems × rate
-  const review2Bonus = (input.review2_qualifying_problems || 0) * (input.review2_per_problem_rate || 50);
-
-  // 4. Hours Percentage Bonus: total_hours × hourly_rate × percent_rate (if eligible)
   const baseEarnings = (input.total_hours || 0) * (input.hourly_rate || 150);
-  const hoursPercentageBonus = (config?.is20PercentEligible ?? false)
-    ? baseEarnings * (input.percent_bonus_rate || 0.20)
+  const hoursPercentageBonus = input.is_20_percent_eligible
+    ? baseEarnings * params.hoursPercentRate
     : 0;
 
-  // 5. Salary Increase Bonus: hours_at_old_salary × (new_rate - old_rate)
   const salaryIncreaseBonus = (input.hours_at_old_salary || 0) > 0 && input.old_hourly_rate && input.new_hourly_rate
     ? (input.hours_at_old_salary || 0) * ((input.new_hourly_rate || 0) - (input.old_hourly_rate || 0))
     : 0;
 
-  // 6. Referral Bonus: count × amount
-  const referralBonus = (input.initial_referral_count || 0) * (input.referral_bonus_amount || 300);
+  const referralBonus = (input.initial_referral_count || 0) * params.referralBonusAmount;
+  const dataBonus = (input.data_files_count || 0) * params.defaultDataFilePrice;
 
-  // 7. Data Bonus: files × price
-  const dataBonus = (input.data_files_count || 0) * (input.price_per_data_file || 200);
-
-  // Total bonus
   const totalBonus = writerBonus + review1Bonus + review2Bonus + hoursPercentageBonus + salaryIncreaseBonus + referralBonus + dataBonus;
   const totalOwed = baseEarnings + totalBonus;
 
   // Save calculation
   const result = await queryOne<WeeklyBonusCalculation>(`
     INSERT INTO weekly_bonus_calculations (
-      expert_id, period_name, period_start, period_end,
+      expert_id, period_id, base_earnings,
       writer_bonus, review1_bonus, review2_bonus,
       hours_percentage_bonus, salary_increase_bonus, referral_bonus, data_bonus,
-      total_bonus, base_earnings, total_owed
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-    ON CONFLICT (expert_id, period_start, period_end) DO UPDATE SET
-      period_name = EXCLUDED.period_name,
+      total_bonus, total_owed
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    ON CONFLICT (expert_id, period_id) DO UPDATE SET
+      base_earnings = EXCLUDED.base_earnings,
       writer_bonus = EXCLUDED.writer_bonus,
       review1_bonus = EXCLUDED.review1_bonus,
       review2_bonus = EXCLUDED.review2_bonus,
@@ -356,38 +444,27 @@ export async function calculateAndSaveBonus(expertId: number, periodStart: Date,
       referral_bonus = EXCLUDED.referral_bonus,
       data_bonus = EXCLUDED.data_bonus,
       total_bonus = EXCLUDED.total_bonus,
-      base_earnings = EXCLUDED.base_earnings,
       total_owed = EXCLUDED.total_owed,
       updated_at = NOW()
     RETURNING *
   `, [
-    expertId,
-    input.period_name || '',
-    periodStart,
-    periodEnd,
-    writerBonus,
-    review1Bonus,
-    review2Bonus,
-    hoursPercentageBonus,
-    salaryIncreaseBonus,
-    referralBonus,
-    dataBonus,
-    totalBonus,
-    baseEarnings,
-    totalOwed,
+    expertId, periodId, baseEarnings,
+    writerBonus, review1Bonus, review2Bonus,
+    hoursPercentageBonus, salaryIncreaseBonus, referralBonus, dataBonus,
+    totalBonus, totalOwed,
   ]);
 
   return result;
 }
 
-export async function getPeriodBonusSummary(periodStart: Date, periodEnd: Date): Promise<ExpertBonusSummary[]> {
+export async function getBonusesByPeriod(periodId: number): Promise<ExpertBonusSummary[]> {
   return query<ExpertBonusSummary>(`
     SELECT
       e.id as "expertId",
       e.name as "expertName",
-      wbi.period_name as "periodName",
-      wbi.period_start as "periodStart",
-      wbi.period_end as "periodEnd",
+      p.period_name as "periodName",
+      p.period_start as "periodStart",
+      p.period_end as "periodEnd",
       COALESCE(wbi.writer_qualifying_problems, 0) as "writerQualifyingProblems",
       COALESCE(wbi.review1_qualifying_problems, 0) as "review1QualifyingProblems",
       COALESCE(wbi.review2_qualifying_problems, 0) as "review2QualifyingProblems",
@@ -407,11 +484,12 @@ export async function getPeriodBonusSummary(periodStart: Date, periodEnd: Date):
       COALESCE(wbc.total_owed, 0) as "totalOwed",
       COALESCE(wbc.is_paid, false) as "isPaid"
     FROM experts e
-    LEFT JOIN weekly_bonus_input wbi ON e.id = wbi.expert_id AND wbi.period_start = $1 AND wbi.period_end = $2
-    LEFT JOIN weekly_bonus_calculations wbc ON e.id = wbc.expert_id AND wbc.period_start = $1 AND wbc.period_end = $2
-    WHERE wbi.id IS NOT NULL OR wbc.id IS NOT NULL
-    ORDER BY "totalOwed" DESC
-  `, [periodStart, periodEnd]);
+    JOIN pay_periods p ON p.id = $1
+    LEFT JOIN weekly_bonus_input wbi ON e.id = wbi.expert_id AND wbi.period_id = $1
+    LEFT JOIN weekly_bonus_calculations wbc ON e.id = wbc.expert_id AND wbc.period_id = $1
+    WHERE wbc.total_owed > 0
+    ORDER BY wbc.total_owed DESC
+  `, [periodId]);
 }
 
 export async function getTotalOwedByExpert(): Promise<ExpertBonusSummary[]> {
@@ -419,16 +497,16 @@ export async function getTotalOwedByExpert(): Promise<ExpertBonusSummary[]> {
     SELECT
       e.id as "expertId",
       e.name as "expertName",
-      '' as "periodName",
-      MIN(wbi.period_start) as "periodStart",
-      MAX(wbi.period_end) as "periodEnd",
-      COALESCE(SUM(wbi.writer_qualifying_problems), 0) as "writerQualifyingProblems",
-      COALESCE(SUM(wbi.review1_qualifying_problems), 0) as "review1QualifyingProblems",
-      COALESCE(SUM(wbi.review2_qualifying_problems), 0) as "review2QualifyingProblems",
+      'All Periods' as "periodName",
+      MIN(p.period_start) as "periodStart",
+      MAX(p.period_end) as "periodEnd",
+      COALESCE(SUM(wbi.writer_qualifying_problems), 0)::int as "writerQualifyingProblems",
+      COALESCE(SUM(wbi.review1_qualifying_problems), 0)::int as "review1QualifyingProblems",
+      COALESCE(SUM(wbi.review2_qualifying_problems), 0)::int as "review2QualifyingProblems",
       COALESCE(SUM(wbi.total_hours), 0) as "totalHours",
       COALESCE(SUM(wbi.hours_at_old_salary), 0) as "hoursAtOldSalary",
-      COALESCE(SUM(wbi.initial_referral_count), 0) as "initialReferralCount",
-      COALESCE(SUM(wbi.data_files_count), 0) as "dataFilesCount",
+      COALESCE(SUM(wbi.initial_referral_count), 0)::int as "initialReferralCount",
+      COALESCE(SUM(wbi.data_files_count), 0)::int as "dataFilesCount",
       COALESCE(SUM(wbc.writer_bonus), 0) as "writerBonus",
       COALESCE(SUM(wbc.review1_bonus), 0) as "review1Bonus",
       COALESCE(SUM(wbc.review2_bonus), 0) as "review2Bonus",
@@ -441,10 +519,11 @@ export async function getTotalOwedByExpert(): Promise<ExpertBonusSummary[]> {
       COALESCE(SUM(wbc.total_owed), 0) as "totalOwed",
       BOOL_AND(COALESCE(wbc.is_paid, true)) as "isPaid"
     FROM experts e
-    LEFT JOIN weekly_bonus_input wbi ON e.id = wbi.expert_id
-    LEFT JOIN weekly_bonus_calculations wbc ON e.id = wbc.expert_id AND wbc.period_start = wbi.period_start AND wbc.period_end = wbi.period_end
-    WHERE wbi.id IS NOT NULL
+    JOIN weekly_bonus_calculations wbc ON e.id = wbc.expert_id
+    JOIN weekly_bonus_input wbi ON e.id = wbi.expert_id AND wbi.period_id = wbc.period_id
+    JOIN pay_periods p ON p.id = wbc.period_id
     GROUP BY e.id, e.name
+    HAVING COALESCE(SUM(wbc.total_owed), 0) > 0
     ORDER BY "totalOwed" DESC
   `);
 }
@@ -454,16 +533,16 @@ export async function getUnpaidBonusByExpert(): Promise<ExpertBonusSummary[]> {
     SELECT
       e.id as "expertId",
       e.name as "expertName",
-      '' as "periodName",
-      MIN(wbi.period_start) as "periodStart",
-      MAX(wbi.period_end) as "periodEnd",
-      COALESCE(SUM(wbi.writer_qualifying_problems), 0) as "writerQualifyingProblems",
-      COALESCE(SUM(wbi.review1_qualifying_problems), 0) as "review1QualifyingProblems",
-      COALESCE(SUM(wbi.review2_qualifying_problems), 0) as "review2QualifyingProblems",
+      'Unpaid Periods' as "periodName",
+      MIN(p.period_start) as "periodStart",
+      MAX(p.period_end) as "periodEnd",
+      COALESCE(SUM(wbi.writer_qualifying_problems), 0)::int as "writerQualifyingProblems",
+      COALESCE(SUM(wbi.review1_qualifying_problems), 0)::int as "review1QualifyingProblems",
+      COALESCE(SUM(wbi.review2_qualifying_problems), 0)::int as "review2QualifyingProblems",
       COALESCE(SUM(wbi.total_hours), 0) as "totalHours",
       COALESCE(SUM(wbi.hours_at_old_salary), 0) as "hoursAtOldSalary",
-      COALESCE(SUM(wbi.initial_referral_count), 0) as "initialReferralCount",
-      COALESCE(SUM(wbi.data_files_count), 0) as "dataFilesCount",
+      COALESCE(SUM(wbi.initial_referral_count), 0)::int as "initialReferralCount",
+      COALESCE(SUM(wbi.data_files_count), 0)::int as "dataFilesCount",
       COALESCE(SUM(wbc.writer_bonus), 0) as "writerBonus",
       COALESCE(SUM(wbc.review1_bonus), 0) as "review1Bonus",
       COALESCE(SUM(wbc.review2_bonus), 0) as "review2Bonus",
@@ -476,9 +555,9 @@ export async function getUnpaidBonusByExpert(): Promise<ExpertBonusSummary[]> {
       COALESCE(SUM(wbc.total_owed), 0) as "totalOwed",
       false as "isPaid"
     FROM experts e
-    LEFT JOIN weekly_bonus_input wbi ON e.id = wbi.expert_id
-    LEFT JOIN weekly_bonus_calculations wbc ON e.id = wbc.expert_id AND wbc.period_start = wbi.period_start AND wbc.period_end = wbi.period_end
-    WHERE wbi.id IS NOT NULL AND (wbc.is_paid = false OR wbc.is_paid IS NULL)
+    JOIN weekly_bonus_calculations wbc ON e.id = wbc.expert_id AND wbc.is_paid = false
+    JOIN weekly_bonus_input wbi ON e.id = wbi.expert_id AND wbi.period_id = wbc.period_id
+    JOIN pay_periods p ON p.id = wbc.period_id
     GROUP BY e.id, e.name
     HAVING COALESCE(SUM(wbc.total_owed), 0) > 0
     ORDER BY "totalOwed" DESC
@@ -487,21 +566,37 @@ export async function getUnpaidBonusByExpert(): Promise<ExpertBonusSummary[]> {
 
 export async function getAllBonusPeriods(): Promise<{ periodName: string; periodStart: Date; periodEnd: Date }[]> {
   return query<{ periodName: string; periodStart: Date; periodEnd: Date }>(`
-    SELECT DISTINCT
+    SELECT
       period_name as "periodName",
       period_start as "periodStart",
       period_end as "periodEnd"
-    FROM weekly_bonus_input
+    FROM pay_periods
     ORDER BY period_start DESC
   `);
 }
 
-export async function markBonusPaid(expertId: number, periodStart: Date, periodEnd: Date, notes?: string): Promise<void> {
+export async function markPeriodPaid(periodId: number, notes?: string): Promise<void> {
+  await withTransaction(async (client) => {
+    await client.query(`
+      UPDATE weekly_bonus_calculations
+      SET is_paid = true, paid_date = NOW(), updated_at = NOW()
+      WHERE period_id = $1
+    `, [periodId]);
+
+    await client.query(`
+      UPDATE pay_periods
+      SET is_paid = true, paid_date = NOW(), notes = COALESCE($2, notes)
+      WHERE id = $1
+    `, [periodId, notes ?? null]);
+  });
+}
+
+export async function markExpertPeriodPaid(expertId: number, periodId: number, notes?: string): Promise<void> {
   await query(`
     UPDATE weekly_bonus_calculations
-    SET is_paid = true, paid_date = NOW(), payment_notes = $4, updated_at = NOW()
-    WHERE expert_id = $1 AND period_start = $2 AND period_end = $3
-  `, [expertId, periodStart, periodEnd, notes ?? null]);
+    SET is_paid = true, paid_date = NOW(), updated_at = NOW()
+    WHERE expert_id = $1 AND period_id = $2
+  `, [expertId, periodId]);
 }
 
 // ============================================
@@ -617,4 +712,150 @@ export async function getStatusCounts(environment?: 'PE' | 'IB'): Promise<Record
     acc[row.status] = Number(row.count);
     return acc;
   }, {} as Record<string, number>);
+}
+
+// ============================================
+// TIMECARD OPERATIONS
+// ============================================
+
+export interface Timecard {
+  id: number;
+  expertId: number | null;
+  employeeName: string;
+  periodId: number | null;
+  periodStart: Date;
+  periodEnd: Date;
+  status: string;
+  hoursRegular: number;
+  hoursApproved: number;
+  hoursTotal: number;
+  alerts: number;
+  timeOffPtoPaid: number;
+  timeOffPtoUnpaid: number;
+  holidaysPaid: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface TimecardRow {
+  employeeName: string;
+  approvalStatus: string;
+  designatedApprover: string;
+  alerts: number;
+  status: string;
+  hoursRegular: number;
+  approvedTotal: string;
+  timeOffPtoPaid: number;
+  timeOffPtoUnpaid: number;
+  holidaysPaid: number;
+}
+
+export async function upsertTimecard(timecard: {
+  employeeName: string;
+  periodStart: Date;
+  periodEnd: Date;
+  status: string;
+  hoursRegular: number;
+  hoursApproved: number;
+  hoursTotal: number;
+  alerts?: number;
+  timeOffPtoPaid?: number;
+  timeOffPtoUnpaid?: number;
+  holidaysPaid?: number;
+}): Promise<Timecard> {
+  // Try to match expert by name
+  const expert = await getExpertByName(timecard.employeeName);
+
+  // Try to find matching pay period
+  const period = await queryOne<{ id: number }>(`
+    SELECT id FROM pay_periods
+    WHERE period_start = $1 AND period_end = $2
+  `, [timecard.periodStart, timecard.periodEnd]);
+
+  const result = await queryOne<Timecard>(`
+    INSERT INTO timecards (
+      expert_id, employee_name, period_id, period_start, period_end,
+      status, hours_regular, hours_approved, hours_total, alerts,
+      time_off_pto_paid, time_off_pto_unpaid, holidays_paid
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    ON CONFLICT (employee_name, period_start, period_end) DO UPDATE SET
+      expert_id = COALESCE($1, timecards.expert_id),
+      period_id = COALESCE($3, timecards.period_id),
+      status = $6,
+      hours_regular = $7,
+      hours_approved = $8,
+      hours_total = $9,
+      alerts = $10,
+      time_off_pto_paid = $11,
+      time_off_pto_unpaid = $12,
+      holidays_paid = $13,
+      updated_at = NOW()
+    RETURNING
+      id, expert_id as "expertId", employee_name as "employeeName",
+      period_id as "periodId", period_start as "periodStart", period_end as "periodEnd",
+      status, hours_regular as "hoursRegular", hours_approved as "hoursApproved",
+      hours_total as "hoursTotal", alerts,
+      time_off_pto_paid as "timeOffPtoPaid", time_off_pto_unpaid as "timeOffPtoUnpaid",
+      holidays_paid as "holidaysPaid", created_at as "createdAt", updated_at as "updatedAt"
+  `, [
+    expert?.id ?? null,
+    timecard.employeeName,
+    period?.id ?? null,
+    timecard.periodStart,
+    timecard.periodEnd,
+    timecard.status,
+    timecard.hoursRegular,
+    timecard.hoursApproved,
+    timecard.hoursTotal,
+    timecard.alerts ?? 0,
+    timecard.timeOffPtoPaid ?? 0,
+    timecard.timeOffPtoUnpaid ?? 0,
+    timecard.holidaysPaid ?? 0,
+  ]);
+
+  return result!;
+}
+
+export async function getTimecardsByPeriod(periodStart: Date, periodEnd: Date): Promise<Timecard[]> {
+  return query<Timecard>(`
+    SELECT
+      id, expert_id as "expertId", employee_name as "employeeName",
+      period_id as "periodId", period_start as "periodStart", period_end as "periodEnd",
+      status, hours_regular as "hoursRegular", hours_approved as "hoursApproved",
+      hours_total as "hoursTotal", alerts,
+      time_off_pto_paid as "timeOffPtoPaid", time_off_pto_unpaid as "timeOffPtoUnpaid",
+      holidays_paid as "holidaysPaid", created_at as "createdAt", updated_at as "updatedAt"
+    FROM timecards
+    WHERE period_start = $1 AND period_end = $2
+    ORDER BY hours_regular DESC
+  `, [periodStart, periodEnd]);
+}
+
+export async function getLatestTimecards(): Promise<Timecard[]> {
+  return query<Timecard>(`
+    SELECT
+      id, expert_id as "expertId", employee_name as "employeeName",
+      period_id as "periodId", period_start as "periodStart", period_end as "periodEnd",
+      status, hours_regular as "hoursRegular", hours_approved as "hoursApproved",
+      hours_total as "hoursTotal", alerts,
+      time_off_pto_paid as "timeOffPtoPaid", time_off_pto_unpaid as "timeOffPtoUnpaid",
+      holidays_paid as "holidaysPaid", created_at as "createdAt", updated_at as "updatedAt"
+    FROM timecards
+    WHERE (period_start, period_end) = (
+      SELECT period_start, period_end FROM timecards ORDER BY period_end DESC LIMIT 1
+    )
+    ORDER BY hours_regular DESC
+  `);
+}
+
+export async function getTimecardPeriods(): Promise<{ periodStart: Date; periodEnd: Date; count: number }[]> {
+  return query<{ periodStart: Date; periodEnd: Date; count: number }>(`
+    SELECT
+      period_start as "periodStart",
+      period_end as "periodEnd",
+      COUNT(*) as count
+    FROM timecards
+    GROUP BY period_start, period_end
+    ORDER BY period_end DESC
+  `);
 }

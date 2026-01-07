@@ -28,7 +28,7 @@ export default function Navigation() {
                   : 'hover:bg-gray-800'
               }`}
             >
-              Status Tracker
+              Problem Management
             </Link>
             <Link
               href="/experts"
@@ -48,7 +48,7 @@ export default function Navigation() {
                   : 'hover:bg-gray-800'
               }`}
             >
-              Bonuses
+              Bonus Management
             </Link>
             <button
               onClick={handleLogout}

@@ -5,8 +5,8 @@ export function middleware(request: NextRequest) {
   const authSession = request.cookies.get('auth_session');
   const { pathname } = request.nextUrl;
 
-  // Allow access to login page and auth API routes
-  if (pathname.startsWith('/login') || pathname.startsWith('/api/auth')) {
+  // Allow access to login page, auth API routes, and all API routes
+  if (pathname.startsWith('/login') || pathname.startsWith('/api/')) {
     return NextResponse.next();
   }
 

@@ -52,7 +52,7 @@ export default function Home() {
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Project Status Tracker</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Problem Management</h1>
             {data && (
               <p className="text-sm text-gray-500 mt-1">
                 Last updated: {new Date(data.lastUpdated).toLocaleString()}
