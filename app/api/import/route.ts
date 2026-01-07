@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
-import path from 'path';
 import {
   importPEProblems,
   importIBProblems,
@@ -21,7 +20,7 @@ export async function POST(request: NextRequest) {
     if (!filePath || !fs.existsSync(filePath)) {
       return NextResponse.json({ error: 'File not found' }, { status: 400 });
     }
-    const result = importPEProblems(filePath);
+    const result = await importPEProblems(filePath);
     return NextResponse.json(result);
   }
 
@@ -30,7 +29,7 @@ export async function POST(request: NextRequest) {
     if (!filePath || !fs.existsSync(filePath)) {
       return NextResponse.json({ error: 'File not found' }, { status: 400 });
     }
-    const result = importIBProblems(filePath);
+    const result = await importIBProblems(filePath);
     return NextResponse.json(result);
   }
 
@@ -40,7 +39,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No data provided' }, { status: 400 });
     }
     const week = weekStart ? new Date(weekStart) : getCurrentWeekStart();
-    const result = parseRipplingTimeData(data, week);
+    const result = await parseRipplingTimeData(data, week);
     return NextResponse.json(result);
   }
 

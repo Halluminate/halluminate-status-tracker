@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { query } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,37 +36,35 @@ interface DetailedProblem {
 
 export async function GET() {
   try {
-    const db = getDb();
-
-    const problems = db.prepare(`
+    const problems = await query<DetailedProblem>(`
       SELECT
         p.id,
-        p.problem_id as problemId,
-        p.spec_number as specNumber,
+        p.problem_id as "problemId",
+        p.spec_number as "specNumber",
         p.environment,
         p.status,
         p.week,
-        sme.name as smeName,
-        feedback.name as feedbackName,
-        qa.name as qaName,
-        engineer.name as engineerName,
-        content_reviewer.name as contentReviewerName,
-        reviewer.name as reviewerName,
-        final_reviewer.name as finalReviewerName,
-        p.problem_doc as problemDoc,
-        p.ground_truth as groundTruth,
-        p.spec_folder as specFolder,
-        p.spec_doc as specDoc,
-        p.spec_data_folder as specDataFolder,
-        p.docker_container as dockerContainer,
-        p.pr_link as prLink,
-        p.blocker_reason as blockerReason,
-        p.sonnet_pass_rate as sonnetPassRate,
-        p.opus_pass_rate as opusPassRate,
-        p.separate_environment_init as separateEnvironmentInit,
-        p.taiga_tag as taigaTag,
-        p.explainer_video as explainerVideo,
-        p.task_description as taskDescription,
+        sme.name as "smeName",
+        feedback.name as "feedbackName",
+        qa.name as "qaName",
+        engineer.name as "engineerName",
+        content_reviewer.name as "contentReviewerName",
+        reviewer.name as "reviewerName",
+        final_reviewer.name as "finalReviewerName",
+        p.problem_doc as "problemDoc",
+        p.ground_truth as "groundTruth",
+        p.spec_folder as "specFolder",
+        p.spec_doc as "specDoc",
+        p.spec_data_folder as "specDataFolder",
+        p.docker_container as "dockerContainer",
+        p.pr_link as "prLink",
+        p.blocker_reason as "blockerReason",
+        p.sonnet_pass_rate as "sonnetPassRate",
+        p.opus_pass_rate as "opusPassRate",
+        p.separate_environment_init as "separateEnvironmentInit",
+        p.taiga_tag as "taigaTag",
+        p.explainer_video as "explainerVideo",
+        p.task_description as "taskDescription",
         p.notes
       FROM problems p
       LEFT JOIN experts sme ON p.sme_id = sme.id
@@ -77,7 +75,7 @@ export async function GET() {
       LEFT JOIN experts reviewer ON p.reviewer_id = reviewer.id
       LEFT JOIN experts final_reviewer ON p.final_reviewer_id = final_reviewer.id
       ORDER BY p.environment, p.spec_number, p.problem_id
-    `).all() as DetailedProblem[];
+    `);
 
     return NextResponse.json({ problems });
   } catch (error) {

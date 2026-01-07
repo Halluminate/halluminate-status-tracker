@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getExpertProblemBreakdown } from '@/lib/db';
+import { getProblemsByExpert } from '@/lib/db';
 
 export async function GET(
   request: Request,
@@ -12,7 +12,17 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid expert ID' }, { status: 400 });
   }
 
-  const breakdown = getExpertProblemBreakdown(expertId);
+  const problems = await getProblemsByExpert(expertId);
 
-  return NextResponse.json({ breakdown });
+  // Group problems by status for breakdown
+  const breakdown = problems.reduce((acc, problem) => {
+    const status = problem.status || 'Unknown';
+    if (!acc[status]) {
+      acc[status] = [];
+    }
+    acc[status].push(problem);
+    return acc;
+  }, {} as Record<string, typeof problems>);
+
+  return NextResponse.json({ breakdown, problems });
 }

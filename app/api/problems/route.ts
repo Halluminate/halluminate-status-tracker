@@ -5,8 +5,10 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const environment = searchParams.get('environment') as 'PE' | 'IB' | null;
 
-  const problems = getAllProblems(environment ?? undefined);
-  const statusCounts = getStatusCounts(environment ?? undefined);
+  const [problems, statusCounts] = await Promise.all([
+    getAllProblems(environment ?? undefined),
+    getStatusCounts(environment ?? undefined),
+  ]);
 
   return NextResponse.json({
     problems,

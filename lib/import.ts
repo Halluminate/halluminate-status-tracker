@@ -1,10 +1,9 @@
 import { parse } from 'csv-parse/sync';
 import fs from 'fs';
 import {
-  getDb,
   upsertExpert,
   upsertProblem,
-  upsertTimeEntry,
+  upsertTimecard,
   getExpertByName,
 } from '@/lib/db';
 import { getExpertRate, type ProblemStatus } from '@/types/experts';
@@ -45,14 +44,14 @@ function normalizeName(name: string | undefined): string | undefined {
   return NAME_ALIASES[trimmed] ?? trimmed;
 }
 
-function getOrCreateExpert(name: string | undefined): number | undefined {
+async function getOrCreateExpert(name: string | undefined): Promise<number | undefined> {
   if (!name) return undefined;
   const normalized = normalizeName(name);
   if (!normalized) return undefined;
 
-  let expert = getExpertByName(normalized);
+  let expert = await getExpertByName(normalized);
   if (!expert) {
-    expert = upsertExpert({
+    expert = await upsertExpert({
       name: normalized,
       hourlyRate: getExpertRate(normalized),
     });
@@ -61,7 +60,7 @@ function getOrCreateExpert(name: string | undefined): number | undefined {
 }
 
 // Import PE Problem Catalog CSV
-export function importPEProblems(csvPath: string): { imported: number; errors: string[] } {
+export async function importPEProblems(csvPath: string): Promise<{ imported: number; errors: string[] }> {
   const content = fs.readFileSync(csvPath, 'utf-8');
   const records = parse(content, {
     columns: true,
@@ -80,12 +79,12 @@ export function importPEProblems(csvPath: string): { imported: number; errors: s
     // Skip empty rows
     if (!id || !status || status.trim() === '') continue;
 
-    const smeId = getOrCreateExpert(row['SME']);
-    const contentReviewerId = getOrCreateExpert(row['Content Reviewer']);
-    const engineerId = getOrCreateExpert(row['Engineer']);
-    const reviewerId = getOrCreateExpert(row['Reviewer']);
+    const smeId = await getOrCreateExpert(row['SME']);
+    const contentReviewerId = await getOrCreateExpert(row['Content Reviewer']);
+    const engineerId = await getOrCreateExpert(row['Engineer']);
+    const reviewerId = await getOrCreateExpert(row['Reviewer']);
 
-    upsertProblem({
+    await upsertProblem({
       problemId: id,
       specNumber: specNum ? parseInt(specNum, 10) : undefined,
       environment: 'PE',
@@ -112,7 +111,7 @@ export function importPEProblems(csvPath: string): { imported: number; errors: s
 }
 
 // Import IB Problem Catalog CSV
-export function importIBProblems(csvPath: string): { imported: number; errors: string[] } {
+export async function importIBProblems(csvPath: string): Promise<{ imported: number; errors: string[] }> {
   const content = fs.readFileSync(csvPath, 'utf-8');
   const records = parse(content, {
     columns: true,
@@ -131,12 +130,12 @@ export function importIBProblems(csvPath: string): { imported: number; errors: s
     // Skip empty rows
     if (!id || !status || status.trim() === '') continue;
 
-    const smeId = getOrCreateExpert(row['SME']);
-    const contentReviewerId = getOrCreateExpert(row['Content Reviewer']);
-    const engineerId = getOrCreateExpert(row['Engineer']);
-    const reviewerId = getOrCreateExpert(row['Reviewer']);
+    const smeId = await getOrCreateExpert(row['SME']);
+    const contentReviewerId = await getOrCreateExpert(row['Content Reviewer']);
+    const engineerId = await getOrCreateExpert(row['Engineer']);
+    const reviewerId = await getOrCreateExpert(row['Reviewer']);
 
-    upsertProblem({
+    await upsertProblem({
       problemId: id,
       specNumber: specNum ? parseInt(specNum, 10) : undefined,
       environment: 'IB',
@@ -184,13 +183,17 @@ function parseHours(hoursStr: string): number {
 }
 
 // Parse Rippling time tracking text (tab-separated format from paste)
-export function parseRipplingTimeData(
+export async function parseRipplingTimeData(
   text: string,
   weekStart: Date
-): { imported: number; errors: string[] } {
+): Promise<{ imported: number; errors: string[] }> {
   const lines = text.trim().split('\n');
   let imported = 0;
   const errors: string[] = [];
+
+  // Calculate week end (7 days after start)
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
 
   for (const line of lines) {
     // Split by multiple spaces or tabs
@@ -202,12 +205,12 @@ export function parseRipplingTimeData(
     }
 
     // Format: Name, Submission Status, Approval Status, ID, Total Hours, Approved Hours
-    const [name, submissionStatus, approvalStatus, ripplingId, totalHoursStr] = parts;
+    const [name, , , , totalHoursStr] = parts;
 
     // Parse approved hours (format: "80h / 80h" or just "80h")
     const approvedHoursStr = parts[5]?.split('/')[0]?.trim() || totalHoursStr;
 
-    const expertId = getOrCreateExpert(name);
+    const expertId = await getOrCreateExpert(name);
     if (!expertId) {
       errors.push(`Could not find or create expert: ${name}`);
       continue;
@@ -216,14 +219,14 @@ export function parseRipplingTimeData(
     const hoursWorked = parseHours(totalHoursStr);
     const hoursApproved = parseHours(approvedHoursStr);
 
-    upsertTimeEntry({
-      expertId,
-      weekStart,
-      hoursWorked,
-      hoursApproved,
-      submissionStatus: submissionStatus as 'Submitted' | 'Not submitted',
-      approvalStatus: approvalStatus as 'Approved' | 'Pending',
-      ripplingEntryId: ripplingId,
+    await upsertTimecard({
+      employeeName: name,
+      periodStart: weekStart,
+      periodEnd: weekEnd,
+      status: 'Imported',
+      hoursRegular: hoursWorked,
+      hoursApproved: hoursApproved,
+      hoursTotal: hoursWorked,
     });
 
     imported++;
@@ -242,7 +245,7 @@ export function getCurrentWeekStart(): Date {
   return monday;
 }
 
-// Initialize database with schema
+// Initialize database with schema (no-op for PostgreSQL, schema managed via migrations)
 export function initializeDatabase(): void {
-  getDb(); // This triggers schema initialization
+  // PostgreSQL schema is managed via migrations, no initialization needed
 }

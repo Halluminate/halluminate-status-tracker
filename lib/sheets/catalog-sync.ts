@@ -4,7 +4,6 @@ import {
   upsertExpert,
   upsertProblem,
   getExpertByName,
-  getDb,
 } from '@/lib/db';
 
 // Name normalization map for matching across data sources
@@ -43,14 +42,14 @@ function normalizeName(name: string | undefined): string | undefined {
   return NAME_ALIASES[trimmed] ?? trimmed;
 }
 
-function getOrCreateExpert(name: string | undefined): number | undefined {
+async function getOrCreateExpert(name: string | undefined): Promise<number | undefined> {
   if (!name) return undefined;
   const normalized = normalizeName(name);
   if (!normalized) return undefined;
 
-  let expert = getExpertByName(normalized);
+  let expert = await getExpertByName(normalized);
   if (!expert) {
-    expert = upsertExpert({
+    expert = await upsertExpert({
       name: normalized,
       hourlyRate: getExpertRate(normalized),
     });
@@ -97,9 +96,6 @@ export async function syncPEProblems(): Promise<{ synced: number; errors: string
     return { synced: 0, errors: ['PE Sheet ID not configured'] };
   }
 
-  // Initialize database
-  getDb();
-
   const rows = await fetchSheetData(spreadsheetId, 'PE Problems Catalog!A:Z');
   if (rows.length === 0) {
     return { synced: 0, errors: ['No data found in sheet'] };
@@ -129,13 +125,13 @@ export async function syncPEProblems(): Promise<{ synced: number; errors: string
     // Skip empty rows
     if (!id || !status || status.trim() === '') continue;
 
-    const smeId = getOrCreateExpert(getValue('SME'));
-    const feedbackId = getOrCreateExpert(getValue('Feedback'));
-    const qaId = getOrCreateExpert(getValue('QA'));
-    const engineerId = getOrCreateExpert(getValue('Engineer'));
-    const finalReviewerId = getOrCreateExpert(getValue('Final Reviewer'));
+    const smeId = await getOrCreateExpert(getValue('SME'));
+    const feedbackId = await getOrCreateExpert(getValue('Feedback'));
+    const qaId = await getOrCreateExpert(getValue('QA'));
+    const engineerId = await getOrCreateExpert(getValue('Engineer'));
+    const finalReviewerId = await getOrCreateExpert(getValue('Final Reviewer'));
 
-    upsertProblem({
+    await upsertProblem({
       problemId: id,
       specNumber: specNum ? parseInt(specNum, 10) : undefined,
       environment: 'PE',
@@ -176,9 +172,6 @@ export async function syncIBProblems(): Promise<{ synced: number; errors: string
     return { synced: 0, errors: ['IB Sheet ID not configured'] };
   }
 
-  // Initialize database
-  getDb();
-
   const rows = await fetchSheetData(spreadsheetId, 'IB Problems Catalog!A:Z');
   if (rows.length === 0) {
     return { synced: 0, errors: ['No data found in sheet'] };
@@ -208,13 +201,13 @@ export async function syncIBProblems(): Promise<{ synced: number; errors: string
     // Skip empty rows
     if (!id || !status || status.trim() === '') continue;
 
-    const smeId = getOrCreateExpert(getValue('SME'));
-    const feedbackId = getOrCreateExpert(getValue('Feedback'));
-    const qaId = getOrCreateExpert(getValue('QA'));
-    const engineerId = getOrCreateExpert(getValue('Engineer'));
-    const finalReviewerId = getOrCreateExpert(getValue('Final Reviewer'));
+    const smeId = await getOrCreateExpert(getValue('SME'));
+    const feedbackId = await getOrCreateExpert(getValue('Feedback'));
+    const qaId = await getOrCreateExpert(getValue('QA'));
+    const engineerId = await getOrCreateExpert(getValue('Engineer'));
+    const finalReviewerId = await getOrCreateExpert(getValue('Final Reviewer'));
 
-    upsertProblem({
+    await upsertProblem({
       problemId: id,
       specNumber: specNum ? parseInt(specNum, 10) : undefined,
       environment: 'IB',

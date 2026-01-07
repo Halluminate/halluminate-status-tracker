@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getExpertDetailedStats } from '@/lib/db';
+import { getExpertSummaryById, getExpertById } from '@/lib/db';
 
 export async function GET(
   request: Request,
@@ -12,11 +12,14 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid expert ID' }, { status: 400 });
   }
 
-  const data = getExpertDetailedStats(expertId);
+  const [expert, summary] = await Promise.all([
+    getExpertById(expertId),
+    getExpertSummaryById(expertId),
+  ]);
 
-  if (!data) {
+  if (!expert) {
     return NextResponse.json({ error: 'Expert not found' }, { status: 404 });
   }
 
-  return NextResponse.json(data);
+  return NextResponse.json({ expert, summary });
 }
