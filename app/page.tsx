@@ -7,7 +7,8 @@ import KPICards from '@/components/status/KPICards';
 import { CombinedData } from '@/types/status';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { RefreshCw, AlertCircle } from 'lucide-react';
+import { RefreshCw, AlertCircle, Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function Home() {
   const [data, setData] = useState<CombinedData | null>(null);
@@ -55,7 +56,28 @@ export default function Home() {
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Problem Management</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold text-foreground">Problem Management</h1>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button className="text-muted-foreground hover:text-foreground transition-colors">
+                    <Info className="h-5 w-5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-sm">
+                  <div className="space-y-2 text-sm">
+                    <p className="font-semibold">Data Sources</p>
+                    <ul className="space-y-1 text-muted-foreground">
+                      <li><span className="text-foreground">Before Dec 20, 2024:</span> Legacy tracking sheets (PE/IB Problem Catalogs)</li>
+                      <li><span className="text-foreground">After Dec 20, 2024:</span> Live from Horizon platform</li>
+                    </ul>
+                    <p className="text-xs text-muted-foreground/70 pt-1 border-t border-border">
+                      Historical assignment data may differ from Horizon records
+                    </p>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </div>
             {data && (
               <p className="text-sm text-muted-foreground mt-1">
                 Last updated: {new Date(data.lastUpdated).toLocaleString()}
