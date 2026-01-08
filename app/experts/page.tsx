@@ -133,34 +133,35 @@ export default function ExpertsPage() {
   };
 
   const SortHeader = ({ label, sortKeyName, className = '', tooltip }: { label: string; sortKeyName: SortKey; className?: string; tooltip?: React.ReactNode }) => {
-    const header = (
+    const content = (
+      <div className="flex items-center gap-1">
+        {label}
+        {sortKey === sortKeyName && (
+          <span className="text-primary">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+        )}
+        {tooltip && <span className="text-muted-foreground/50 ml-1">ⓘ</span>}
+      </div>
+    );
+
+    return (
       <th
         className={`px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted/50 ${className}`}
         onClick={() => handleSort(sortKeyName)}
       >
-        <div className="flex items-center gap-1">
-          {label}
-          {sortKey === sortKeyName && (
-            <span className="text-primary">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-          )}
-        </div>
+        {tooltip ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="cursor-help">{content}</span>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs">
+              {tooltip}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          content
+        )}
       </th>
     );
-
-    if (tooltip) {
-      return (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            {header}
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-xs">
-            {tooltip}
-          </TooltipContent>
-        </Tooltip>
-      );
-    }
-
-    return header;
   };
 
   if (loading) {
