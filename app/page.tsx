@@ -112,40 +112,70 @@ export default function Home() {
         {/* Dashboard Content */}
         {filteredData && !loading && (
           <>
-            {/* Progress Tracker - Goal: 500 Problems */}
+            {/* Status Distribution Progress Tracker */}
             {(() => {
-              const delivered = filteredData.sheets.reduce((sum, sheet) => {
-                const deliveredRow = sheet.rows.find(r => r.status === 'Delivered');
-                return sum + (deliveredRow?.total || 0);
-              }, 0);
+              // Get counts for each status
+              const getStatusCount = (status: string) => {
+                return filteredData.sheets.reduce((sum, sheet) => {
+                  const row = sheet.rows.find(r => r.status === status);
+                  return sum + (row?.total || 0);
+                }, 0);
+              };
+
+              const statuses = [
+                { name: 'In-Progress', count: getStatusCount('In-Progress'), color: '#3B82F6' }, // blue
+                { name: 'Review 1', count: getStatusCount('Review 1'), color: '#06B6D4' }, // cyan
+                { name: 'Review 2', count: getStatusCount('Review 2'), color: '#FBBF24' }, // yellow
+                { name: 'Trajectory Testing', count: getStatusCount('Trajectory Testing'), color: '#F97316' }, // orange
+                { name: 'Ready for Delivery', count: getStatusCount('Ready for Delivery'), color: '#14B8A6' }, // teal
+                { name: 'Delivered', count: getStatusCount('Delivered'), color: '#22C55E' }, // green
+                { name: 'Blocked', count: getStatusCount('Blocked'), color: '#EF4444' }, // red
+              ];
+
+              const totalProblems = statuses.reduce((sum, s) => sum + s.count, 0);
               const goal = 500;
-              const percentage = Math.min((delivered / goal) * 100, 100);
 
               return (
                 <div className="mb-8 p-6 bg-card border border-border rounded-lg">
                   <div className="flex justify-between items-center mb-3">
-                    <div>
-                      <h2 className="text-lg font-semibold text-foreground">Delivery Progress</h2>
-                      <p className="text-sm text-muted-foreground">Problems delivered toward 500 goal</p>
-                    </div>
+                    <h2 className="text-lg font-semibold text-foreground">Status Distribution</h2>
                     <div className="text-right">
-                      <span className="text-3xl font-bold text-foreground">{delivered}</span>
-                      <span className="text-xl text-muted-foreground"> / {goal}</span>
-                      <p className="text-sm font-medium text-muted-foreground">{percentage.toFixed(1)}% complete</p>
+                      <span className="text-3xl font-bold text-foreground">{totalProblems}</span>
+                      <span className="text-lg text-muted-foreground"> problems</span>
                     </div>
                   </div>
-                  <div className="w-full bg-muted rounded-full h-4 overflow-hidden">
-                    <div
-                      className="h-full bg-green-600 rounded-full transition-all duration-500"
-                      style={{ width: `${percentage}%` }}
-                    />
+
+                  {/* Stacked Progress Bar */}
+                  <div className="w-full bg-muted rounded-full h-4 overflow-hidden flex">
+                    {statuses.map((status) => {
+                      const widthPercent = totalProblems > 0 ? (status.count / goal) * 100 : 0;
+                      if (status.count === 0) return null;
+                      return (
+                        <div
+                          key={status.name}
+                          className="h-full transition-all duration-500"
+                          style={{
+                            width: `${widthPercent}%`,
+                            backgroundColor: status.color,
+                          }}
+                          title={`${status.name}: ${status.count}`}
+                        />
+                      );
+                    })}
                   </div>
-                  <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                    <span>0</span>
-                    <span>125</span>
-                    <span>250</span>
-                    <span>375</span>
-                    <span>500</span>
+
+                  {/* Legend */}
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3">
+                    {statuses.map((status) => (
+                      <div key={status.name} className="flex items-center gap-1.5 text-sm">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full"
+                          style={{ backgroundColor: status.color }}
+                        />
+                        <span className="text-muted-foreground">{status.name}</span>
+                        <span className="font-medium text-foreground">{status.count}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               );
