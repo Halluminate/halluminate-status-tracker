@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import StatusTable from '@/components/status/StatusTable';
-import ExpertTable from '@/components/status/ExpertTable';
 import KPICards from '@/components/status/KPICards';
 import { CombinedData } from '@/types/status';
 import { Button } from '@/components/ui/button';
@@ -15,7 +14,6 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'All' | 'PE' | 'IB'>('All');
-  const [view, setView] = useState<'weekly' | 'expert'>('weekly');
 
   useEffect(() => {
     fetchData();
@@ -45,9 +43,6 @@ export default function Home() {
     sheets: filter === 'All'
       ? data.sheets
       : data.sheets.filter(sheet => sheet.name === filter),
-    expertSheets: filter === 'All'
-      ? data.expertSheets
-      : data.expertSheets.filter(sheet => sheet.name === filter)
   } : null;
 
   return (
@@ -205,37 +200,13 @@ export default function Home() {
 
             <KPICards data={filteredData.sheets} />
 
-            {/* View Toggle */}
-            <div className="mb-6 flex gap-2">
-              <Button
-                onClick={() => setView('weekly')}
-                variant={view === 'weekly' ? 'default' : 'secondary'}
-                className="px-6"
-              >
-                Weekly Progress View
-              </Button>
-              <Button
-                onClick={() => setView('expert')}
-                variant={view === 'expert' ? 'default' : 'secondary'}
-                className="px-6"
-              >
-                Expert View
-              </Button>
-            </div>
-
-            {/* Content based on view */}
+            {/* Status Table */}
             <Card>
               <CardHeader>
-                <CardTitle>
-                  {view === 'weekly' ? 'Weekly Progress Overview' : 'Expert Overview'}
-                </CardTitle>
+                <CardTitle>Weekly Progress Overview</CardTitle>
               </CardHeader>
               <CardContent>
-                {view === 'weekly' ? (
-                  <StatusTable data={filteredData.sheets} />
-                ) : (
-                  <ExpertTable data={filteredData.expertSheets} />
-                )}
+                <StatusTable data={filteredData.sheets} />
               </CardContent>
             </Card>
           </>
