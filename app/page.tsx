@@ -112,6 +112,45 @@ export default function Home() {
         {/* Dashboard Content */}
         {filteredData && !loading && (
           <>
+            {/* Progress Tracker - Goal: 500 Problems */}
+            {(() => {
+              const delivered = filteredData.sheets.reduce((sum, sheet) => {
+                const deliveredRow = sheet.rows.find(r => r.status === 'Delivered');
+                return sum + (deliveredRow?.total || 0);
+              }, 0);
+              const goal = 500;
+              const percentage = Math.min((delivered / goal) * 100, 100);
+
+              return (
+                <div className="mb-8 p-6 bg-card border border-border rounded-lg">
+                  <div className="flex justify-between items-center mb-3">
+                    <div>
+                      <h2 className="text-lg font-semibold text-foreground">Delivery Progress</h2>
+                      <p className="text-sm text-muted-foreground">Problems delivered toward 500 goal</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-3xl font-bold text-foreground">{delivered}</span>
+                      <span className="text-xl text-muted-foreground"> / {goal}</span>
+                      <p className="text-sm font-medium text-muted-foreground">{percentage.toFixed(1)}% complete</p>
+                    </div>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-4 overflow-hidden">
+                    <div
+                      className="h-full bg-green-600 rounded-full transition-all duration-500"
+                      style={{ width: `${percentage}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                    <span>0</span>
+                    <span>125</span>
+                    <span>250</span>
+                    <span>375</span>
+                    <span>500</span>
+                  </div>
+                </div>
+              );
+            })()}
+
             <KPICards data={filteredData.sheets} />
 
             {/* View Toggle */}
