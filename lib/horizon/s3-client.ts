@@ -371,6 +371,76 @@ export async function getActivityByExpert(): Promise<Map<string, ExpertActivityS
   return stats;
 }
 
+// Review tracking from activity log
+export interface ExpertReviewStats {
+  expertName: string;
+  reviewsThisWeek: number;
+  reviewsThisMonth: number;
+  totalReviews: number;
+}
+
+// Get review counts by expert from activity log
+// Reviews are detected by status changes: review_1 → review_2 (Review 1 complete)
+// or review_2 → ready_for_delivery/traj_testing (Review 2 complete)
+export async function getReviewsByExpert(): Promise<Map<string, ExpertReviewStats>> {
+  const activityLog = await getActivityLog(1000); // Get more entries for reviews
+  const stats = new Map<string, ExpertReviewStats>();
+
+  // Calculate date boundaries
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  startOfMonth.setHours(0, 0, 0, 0);
+
+  for (const entry of activityLog) {
+    // Look for status change activities that indicate a review
+    const isReviewActivity =
+      // Check if it's a status change with review progression
+      (entry.oldValue === 'review_1' && entry.newValue === 'review_2') ||
+      (entry.oldValue === 'review_1' && entry.newValue === 'ready_for_delivery') ||
+      (entry.oldValue === 'review_2' && entry.newValue === 'ready_for_delivery') ||
+      (entry.oldValue === 'review_2' && entry.newValue === 'traj_testing') ||
+      (entry.oldValue === 'review' && entry.newValue === 'review_2') ||
+      (entry.oldValue === 'submitted' && entry.newValue === 'review_2') ||
+      // Also check for explicit review types
+      entry.type === 'review_completed' ||
+      entry.type === 'review_submitted' ||
+      entry.type === 'review_approved' ||
+      // Check description for review keywords
+      (entry.description?.toLowerCase().includes('review') && entry.description?.toLowerCase().includes('complet'));
+
+    if (!isReviewActivity) continue;
+
+    const expertName = `${entry.actor.firstName} ${entry.actor.lastName}`;
+    const entryDate = new Date(entry.timestamp);
+
+    // Initialize if needed
+    if (!stats.has(expertName)) {
+      stats.set(expertName, {
+        expertName,
+        reviewsThisWeek: 0,
+        reviewsThisMonth: 0,
+        totalReviews: 0,
+      });
+    }
+
+    const expertStats = stats.get(expertName)!;
+    expertStats.totalReviews++;
+
+    if (entryDate >= startOfWeek) {
+      expertStats.reviewsThisWeek++;
+    }
+    if (entryDate >= startOfMonth) {
+      expertStats.reviewsThisMonth++;
+    }
+  }
+
+  return stats;
+}
+
 // Problem info with dates
 export interface ProblemInfo {
   id: string;

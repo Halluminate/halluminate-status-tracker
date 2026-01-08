@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { getAllProblemsWithDates, getActivityByExpert } from '@/lib/horizon/s3-client';
+import { getAllProblemsWithDates, getActivityByExpert, getReviewsByExpert } from '@/lib/horizon/s3-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,6 +40,9 @@ interface ExpertStats {
   problemsThisWeek: number;
   problemsThisMonth: number;
   totalProblems: number;
+  reviewsThisWeek: number;
+  reviewsThisMonth: number;
+  totalReviews: number;
   pricePerProblem: number | null;
 }
 
@@ -111,10 +114,11 @@ export async function GET() {
       }
     }
 
-    // Get Horizon problem data and activity
-    const [horizonProblems, activityStatsMap] = await Promise.all([
+    // Get Horizon problem data, activity, and reviews
+    const [horizonProblems, activityStatsMap, reviewStatsMap] = await Promise.all([
       getAllProblemsWithDates(),
       getActivityByExpert(),
+      getReviewsByExpert(),
     ]);
 
     // Create maps for problem counts and last active
@@ -147,11 +151,23 @@ export async function GET() {
       }
     }
 
+    // Build review stats map keyed by lowercase name
+    const reviewsMap = new Map<string, { week: number; month: number; total: number }>();
+    for (const [expertName, reviewStats] of reviewStatsMap) {
+      const key = expertName.toLowerCase().replace(/\s+/g, '-');
+      reviewsMap.set(key, {
+        week: reviewStats.reviewsThisWeek,
+        month: reviewStats.reviewsThisMonth,
+        total: reviewStats.totalReviews,
+      });
+    }
+
     // Combine all data
     const expertStats: ExpertStats[] = experts.map(expert => {
       const horizonKey = expert.horizon_user_id || expert.name.toLowerCase().replace(/\s+/g, '-');
       const hours = hoursMap.get(expert.id) || { total: 0, week: 0, month: 0 };
       const problems = problemsMap.get(horizonKey) || { total: 0, week: 0, month: 0 };
+      const reviews = reviewsMap.get(horizonKey) || { week: 0, month: 0, total: 0 };
       const lastActive = lastActiveMap.get(horizonKey) || null;
 
       const totalCost = hours.total * Number(expert.hourly_rate);
@@ -170,6 +186,9 @@ export async function GET() {
         problemsThisWeek: problems.week,
         problemsThisMonth: problems.month,
         totalProblems: problems.total,
+        reviewsThisWeek: reviews.week,
+        reviewsThisMonth: reviews.month,
+        totalReviews: reviews.total,
         pricePerProblem,
       };
     });
@@ -183,6 +202,9 @@ export async function GET() {
       totalProblems: acc.totalProblems + e.totalProblems,
       problemsThisWeek: acc.problemsThisWeek + e.problemsThisWeek,
       problemsThisMonth: acc.problemsThisMonth + e.problemsThisMonth,
+      totalReviews: acc.totalReviews + e.totalReviews,
+      reviewsThisWeek: acc.reviewsThisWeek + e.reviewsThisWeek,
+      reviewsThisMonth: acc.reviewsThisMonth + e.reviewsThisMonth,
     }), {
       totalExperts: 0,
       totalHours: 0,
@@ -191,6 +213,9 @@ export async function GET() {
       totalProblems: 0,
       problemsThisWeek: 0,
       problemsThisMonth: 0,
+      totalReviews: 0,
+      reviewsThisWeek: 0,
+      reviewsThisMonth: 0,
     });
 
     // Get last Rippling sync time from most recent timecard update

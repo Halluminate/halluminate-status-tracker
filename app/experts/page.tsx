@@ -17,6 +17,9 @@ interface ExpertStats {
   problemsThisWeek: number;
   problemsThisMonth: number;
   totalProblems: number;
+  reviewsThisWeek: number;
+  reviewsThisMonth: number;
+  totalReviews: number;
   pricePerProblem: number | null;
 }
 
@@ -38,6 +41,9 @@ interface StatsData {
     totalProblems: number;
     problemsThisWeek: number;
     problemsThisMonth: number;
+    totalReviews: number;
+    reviewsThisWeek: number;
+    reviewsThisMonth: number;
   };
   metadata: Metadata;
 }
@@ -295,6 +301,8 @@ export default function ExpertsPage() {
                     <SortHeader label="Total Hrs" sortKeyName="totalHours" className="text-right" />
                     <SortHeader label="Prob/Week" sortKeyName="problemsThisWeek" className="text-right" />
                     <SortHeader label="Prob/Month" sortKeyName="problemsThisMonth" className="text-right" />
+                    <SortHeader label="Rev/Week" sortKeyName="reviewsThisWeek" className="text-right" />
+                    <SortHeader label="Rev/Month" sortKeyName="reviewsThisMonth" className="text-right" />
                     <SortHeader label="$/Problem" sortKeyName="pricePerProblem" className="text-right" />
                   </tr>
                 </thead>
@@ -340,6 +348,12 @@ export default function ExpertsPage() {
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap text-sm text-right font-mono text-primary">
                         {expert.problemsThisMonth}
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-sm text-right font-mono text-orange-400">
+                        {expert.reviewsThisWeek || ''}
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-sm text-right font-mono text-orange-400">
+                        {expert.reviewsThisMonth || ''}
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap text-sm text-right font-mono text-muted-foreground">
                         {formatCurrency(expert.pricePerProblem)}
