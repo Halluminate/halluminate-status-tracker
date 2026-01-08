@@ -1,32 +1,21 @@
 'use client';
 
-import { Fragment } from 'react';
 import { SheetData, StatusRow } from '@/types/status';
 
 interface StatusTableProps {
   data: SheetData[];
 }
 
-// Define status sections matching Horizon workflow statuses
-const STATUS_SECTIONS = {
-  'In Progress': [
-    'In-Progress',
-  ],
-  'Review': [
-    'Review 1',
-    'Review 2',
-  ],
-  'Pre-Delivery': [
-    'Ready for Delivery',
-    'Trajectory Testing',
-  ],
-  'Delivered': [
-    'Delivered',
-  ],
-  'Blocked': [
-    'Blocked',
-  ],
-};
+// Define status order for display
+const STATUS_ORDER = [
+  'In-Progress',
+  'Review 1',
+  'Review 2',
+  'Trajectory Testing',
+  'Ready for Delivery',
+  'Delivered',
+  'Blocked',
+];
 
 export default function StatusTable({ data }: StatusTableProps) {
   if (!data || data.length === 0) {
@@ -44,58 +33,20 @@ export default function StatusTable({ data }: StatusTableProps) {
     sheet.rows.forEach(row => {
       const existing = statusMap.get(row.status);
       if (existing) {
-        // Combine with existing
         existing.total += row.total;
       } else {
-        // Add new entry
         statusMap.set(row.status, { ...row });
       }
     });
   });
 
-  // Group statuses by section
-  const renderSection = (sectionName: string, statuses: string[]) => {
-    const sectionRows = statuses
-      .map(status => statusMap.get(status))
-      .filter(row => row !== undefined) as StatusRow[];
+  // Get rows in defined order, filter out zeros
+  const orderedRows = STATUS_ORDER
+    .map(status => statusMap.get(status))
+    .filter((row): row is StatusRow => row !== undefined && row.total > 0);
 
-    if (sectionRows.length === 0) return null;
-
-    // Calculate section subtotal
-    const subtotal = {
-      total: sectionRows.reduce((sum, row) => sum + row.total, 0),
-    };
-
-    return (
-      <Fragment key={sectionName}>
-        {/* Section Header */}
-        <tr className="bg-muted">
-          <td colSpan={2} className="border border-border px-4 py-2 font-bold text-foreground">
-            {sectionName}
-          </td>
-        </tr>
-
-        {/* Section Rows */}
-        {sectionRows.map((row, idx) => (
-          <tr key={row.status} className={idx % 2 === 0 ? 'bg-background' : 'bg-muted/50'}>
-            <td className="border border-border px-4 py-2 font-medium text-foreground pl-8">{row.status}</td>
-            <td className="border border-border px-4 py-2 text-center font-bold bg-muted text-foreground">{row.total}</td>
-          </tr>
-        ))}
-
-        {/* Subtotal Row */}
-        <tr className="bg-muted/70 font-bold">
-          <td className="border border-border px-4 py-2 text-foreground">Subtotal</td>
-          <td className="border border-border px-4 py-2 text-center bg-muted text-foreground">{subtotal.total}</td>
-        </tr>
-      </Fragment>
-    );
-  };
-
-  // Calculate grand total across all statuses
-  const grandTotal = {
-    total: Array.from(statusMap.values()).reduce((sum, row) => sum + row.total, 0),
-  };
+  // Calculate grand total
+  const grandTotal = orderedRows.reduce((sum, row) => sum + row.total, 0);
 
   return (
     <div className="overflow-x-auto">
@@ -103,18 +54,21 @@ export default function StatusTable({ data }: StatusTableProps) {
         <thead>
           <tr className="bg-primary text-primary-foreground">
             <th className="border border-border px-4 py-3 text-left font-semibold">Status</th>
-            <th className="border border-border px-4 py-3 text-center font-semibold bg-primary/80">Total</th>
+            <th className="border border-border px-4 py-3 text-center font-semibold bg-primary/80 w-32">Total</th>
           </tr>
         </thead>
         <tbody>
-          {Object.entries(STATUS_SECTIONS).map(([sectionName, statuses]) =>
-            renderSection(sectionName, statuses)
-          )}
+          {orderedRows.map((row, idx) => (
+            <tr key={row.status} className={idx % 2 === 0 ? 'bg-background' : 'bg-muted/50'}>
+              <td className="border border-border px-4 py-2 font-medium text-foreground">{row.status}</td>
+              <td className="border border-border px-4 py-2 text-center font-bold bg-muted text-foreground">{row.total}</td>
+            </tr>
+          ))}
 
           {/* Grand Total Row */}
           <tr className="bg-primary text-primary-foreground font-bold">
-            <td className="border border-border px-4 py-3">Grand Total</td>
-            <td className="border border-border px-4 py-3 text-center bg-primary/80">{grandTotal.total}</td>
+            <td className="border border-border px-4 py-3">Total</td>
+            <td className="border border-border px-4 py-3 text-center bg-primary/80">{grandTotal}</td>
           </tr>
         </tbody>
       </table>
