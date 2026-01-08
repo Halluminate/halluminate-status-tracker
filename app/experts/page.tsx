@@ -222,7 +222,7 @@ export default function ExpertsPage() {
 
         {/* Summary Stats */}
         {data && (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
             <div className="bg-muted rounded-lg p-4">
               <div className="text-xs font-medium text-muted-foreground uppercase">Experts</div>
               <div className="text-xl font-bold text-foreground">{data.totals.totalExperts}</div>
@@ -245,25 +245,6 @@ export default function ExpertsPage() {
                 </Tooltip>
               </div>
               <div className="text-xl font-bold text-foreground">{formatHours(data.totals.hoursThisWeek)}</div>
-            </div>
-            <div className="bg-muted rounded-lg p-4">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase">
-                Hours/Month
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button type="button" className="text-muted-foreground/70 hover:text-foreground">
-                      <Info className="h-3.5 w-3.5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <div className="text-sm">
-                      <div className="font-medium">{formatDateRange(data.metadata.monthStart, data.metadata.monthEnd)}</div>
-                      <div className="text-muted-foreground">Last Rippling sync: {formatSyncTime(data.metadata.lastRipplingSync)}</div>
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <div className="text-xl font-bold text-foreground">{formatHours(data.totals.hoursThisMonth)}</div>
             </div>
             <div className="bg-muted rounded-lg p-4">
               <div className="text-xs font-medium text-muted-foreground uppercase">Total Hours</div>
@@ -330,17 +311,6 @@ export default function ExpertsPage() {
                         </div>
                       }
                     />
-                    <SortHeader
-                      label="Hrs/Month"
-                      sortKeyName="hoursThisMonth"
-                      className="text-right"
-                      tooltip={
-                        <div className="text-sm">
-                          <div className="font-medium">{formatDateRange(data.metadata.monthStart, data.metadata.monthEnd)}</div>
-                          <div className="text-muted-foreground">Last Rippling sync: {formatSyncTime(data.metadata.lastRipplingSync)}</div>
-                        </div>
-                      }
-                    />
                     <SortHeader label="Total Hrs" sortKeyName="totalHours" className="text-right" />
                     <SortHeader label="Prob/Week" sortKeyName="problemsThisWeek" className="text-right" />
                     <SortHeader label="Prob/Month" sortKeyName="problemsThisMonth" className="text-right" />
@@ -381,9 +351,6 @@ export default function ExpertsPage() {
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap text-sm text-right font-mono text-foreground">
                         {formatHours(expert.hoursThisWeek)}
-                      </td>
-                      <td className="px-3 py-3 whitespace-nowrap text-sm text-right font-mono text-foreground">
-                        {formatHours(expert.hoursThisMonth)}
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap text-sm text-right font-mono font-medium text-foreground">
                         {formatHours(expert.totalHours)}
