@@ -31,7 +31,7 @@ const STATUS_SECTIONS = {
 export default function StatusTable({ data }: StatusTableProps) {
   if (!data || data.length === 0) {
     return (
-      <div className="text-center py-8 text-black">
+      <div className="text-center py-8 text-muted-foreground">
         No data available
       </div>
     );
@@ -69,24 +69,24 @@ export default function StatusTable({ data }: StatusTableProps) {
     return (
       <Fragment key={sectionName}>
         {/* Section Header */}
-        <tr className="bg-gray-600">
-          <td colSpan={2} className="border border-gray-300 px-4 py-2 font-bold text-white">
+        <tr className="bg-muted">
+          <td colSpan={2} className="border border-border px-4 py-2 font-bold text-foreground">
             {sectionName}
           </td>
         </tr>
 
         {/* Section Rows */}
         {sectionRows.map((row, idx) => (
-          <tr key={row.status} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-            <td className="border border-gray-300 px-4 py-2 font-medium text-black pl-8">{row.status}</td>
-            <td className="border border-gray-300 px-4 py-2 text-center font-bold bg-gray-100 text-black">{row.total}</td>
+          <tr key={row.status} className={idx % 2 === 0 ? 'bg-background' : 'bg-muted/50'}>
+            <td className="border border-border px-4 py-2 font-medium text-foreground pl-8">{row.status}</td>
+            <td className="border border-border px-4 py-2 text-center font-bold bg-muted text-foreground">{row.total}</td>
           </tr>
         ))}
 
         {/* Subtotal Row */}
-        <tr className="bg-gray-300 font-bold">
-          <td className="border border-gray-300 px-4 py-2 text-black">Subtotal</td>
-          <td className="border border-gray-300 px-4 py-2 text-center bg-gray-400 text-black">{subtotal.total}</td>
+        <tr className="bg-muted/70 font-bold">
+          <td className="border border-border px-4 py-2 text-foreground">Subtotal</td>
+          <td className="border border-border px-4 py-2 text-center bg-muted text-foreground">{subtotal.total}</td>
         </tr>
       </Fragment>
     );
@@ -99,11 +99,11 @@ export default function StatusTable({ data }: StatusTableProps) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full border-collapse border border-gray-300">
+      <table className="min-w-full border-collapse border border-border">
         <thead>
-          <tr className="bg-gray-800 text-white">
-            <th className="border border-gray-300 px-4 py-3 text-left font-semibold">Status</th>
-            <th className="border border-gray-300 px-4 py-3 text-center font-semibold bg-gray-900">Total</th>
+          <tr className="bg-primary text-primary-foreground">
+            <th className="border border-border px-4 py-3 text-left font-semibold">Status</th>
+            <th className="border border-border px-4 py-3 text-center font-semibold bg-primary/80">Total</th>
           </tr>
         </thead>
         <tbody>
@@ -112,9 +112,9 @@ export default function StatusTable({ data }: StatusTableProps) {
           )}
 
           {/* Grand Total Row */}
-          <tr className="bg-gray-800 text-white font-bold">
-            <td className="border border-gray-300 px-4 py-3">Grand Total</td>
-            <td className="border border-gray-300 px-4 py-3 text-center bg-gray-900">{grandTotal.total}</td>
+          <tr className="bg-primary text-primary-foreground font-bold">
+            <td className="border border-border px-4 py-3">Grand Total</td>
+            <td className="border border-border px-4 py-3 text-center bg-primary/80">{grandTotal.total}</td>
           </tr>
         </tbody>
       </table>
