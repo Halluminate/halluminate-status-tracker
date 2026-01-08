@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { Info } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ExpertStats {
@@ -133,33 +134,33 @@ export default function ExpertsPage() {
   };
 
   const SortHeader = ({ label, sortKeyName, className = '', tooltip }: { label: string; sortKeyName: SortKey; className?: string; tooltip?: React.ReactNode }) => {
-    const content = (
-      <div className="flex items-center gap-1">
-        {label}
-        {sortKey === sortKeyName && (
-          <span className="text-primary">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-        )}
-        {tooltip && <span className="text-muted-foreground/50 ml-1">ⓘ</span>}
-      </div>
-    );
-
     return (
       <th
         className={`px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted/50 ${className}`}
         onClick={() => handleSort(sortKeyName)}
       >
-        {tooltip ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="cursor-help">{content}</span>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-xs">
-              {tooltip}
-            </TooltipContent>
-          </Tooltip>
-        ) : (
-          content
-        )}
+        <div className="flex items-center gap-1">
+          {label}
+          {sortKey === sortKeyName && (
+            <span className="text-primary">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+          )}
+          {tooltip && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="ml-1 text-muted-foreground/70 hover:text-foreground"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Info className="h-3.5 w-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs">
+                {tooltip}
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
       </th>
     );
   };
@@ -201,34 +202,44 @@ export default function ExpertsPage() {
               <div className="text-xs font-medium text-muted-foreground uppercase">Experts</div>
               <div className="text-xl font-bold text-foreground">{data.totals.totalExperts}</div>
             </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="bg-muted rounded-lg p-4 cursor-help">
-                  <div className="text-xs font-medium text-muted-foreground uppercase">Hours/Week</div>
-                  <div className="text-xl font-bold text-foreground">{formatHours(data.totals.hoursThisWeek)}</div>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <div className="text-sm">
-                  <div className="font-medium">{formatDateRange(data.metadata.weekStart, data.metadata.weekEnd)}</div>
-                  <div className="text-muted-foreground">Last Rippling sync: {formatSyncTime(data.metadata.lastRipplingSync)}</div>
-                </div>
-              </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="bg-muted rounded-lg p-4 cursor-help">
-                  <div className="text-xs font-medium text-muted-foreground uppercase">Hours/Month</div>
-                  <div className="text-xl font-bold text-foreground">{formatHours(data.totals.hoursThisMonth)}</div>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <div className="text-sm">
-                  <div className="font-medium">{formatDateRange(data.metadata.monthStart, data.metadata.monthEnd)}</div>
-                  <div className="text-muted-foreground">Last Rippling sync: {formatSyncTime(data.metadata.lastRipplingSync)}</div>
-                </div>
-              </TooltipContent>
-            </Tooltip>
+            <div className="bg-muted rounded-lg p-4">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase">
+                Hours/Week
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-muted-foreground/70 hover:text-foreground">
+                      <Info className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="text-sm">
+                      <div className="font-medium">{formatDateRange(data.metadata.weekStart, data.metadata.weekEnd)}</div>
+                      <div className="text-muted-foreground">Last Rippling sync: {formatSyncTime(data.metadata.lastRipplingSync)}</div>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <div className="text-xl font-bold text-foreground">{formatHours(data.totals.hoursThisWeek)}</div>
+            </div>
+            <div className="bg-muted rounded-lg p-4">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase">
+                Hours/Month
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-muted-foreground/70 hover:text-foreground">
+                      <Info className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="text-sm">
+                      <div className="font-medium">{formatDateRange(data.metadata.monthStart, data.metadata.monthEnd)}</div>
+                      <div className="text-muted-foreground">Last Rippling sync: {formatSyncTime(data.metadata.lastRipplingSync)}</div>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <div className="text-xl font-bold text-foreground">{formatHours(data.totals.hoursThisMonth)}</div>
+            </div>
             <div className="bg-muted rounded-lg p-4">
               <div className="text-xs font-medium text-muted-foreground uppercase">Total Hours</div>
               <div className="text-xl font-bold text-foreground">{formatHours(data.totals.totalHours)}</div>
