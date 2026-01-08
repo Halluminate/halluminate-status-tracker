@@ -357,14 +357,15 @@ export async function upsertWeeklyBonusInput(input: {
   newHourlyRate?: number;
   initialReferralCount?: number;
   dataFilesCount?: number;
+  notes?: string;
 }): Promise<void> {
   await query(`
     INSERT INTO weekly_bonus_input (
       expert_id, period_id, total_hours, hourly_rate,
       writer_qualifying_problems, review1_qualifying_problems, review2_qualifying_problems,
       is_20_percent_eligible, hours_at_old_salary, old_hourly_rate, new_hourly_rate,
-      initial_referral_count, data_files_count
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      initial_referral_count, data_files_count, notes
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
     ON CONFLICT (expert_id, period_id) DO UPDATE SET
       total_hours = EXCLUDED.total_hours,
       hourly_rate = EXCLUDED.hourly_rate,
@@ -377,6 +378,7 @@ export async function upsertWeeklyBonusInput(input: {
       new_hourly_rate = EXCLUDED.new_hourly_rate,
       initial_referral_count = EXCLUDED.initial_referral_count,
       data_files_count = EXCLUDED.data_files_count,
+      notes = EXCLUDED.notes,
       updated_at = NOW()
   `, [
     input.expertId,
@@ -392,6 +394,7 @@ export async function upsertWeeklyBonusInput(input: {
     input.newHourlyRate ?? null,
     input.initialReferralCount ?? 0,
     input.dataFilesCount ?? 0,
+    input.notes ?? null,
   ]);
 }
 

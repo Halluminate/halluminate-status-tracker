@@ -89,6 +89,7 @@ const defaultFormData = {
   newHourlyRate: '',
   initialReferralCount: '',
   dataFilesCount: '',
+  notes: '',
 };
 
 export default function BonusesPage() {
@@ -172,7 +173,7 @@ export default function BonusesPage() {
     });
   };
 
-  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     if (type === 'checkbox') {
       setFormData({ ...formData, [name]: (e.target as HTMLInputElement).checked });
@@ -557,6 +558,19 @@ export default function BonusesPage() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
+                </div>
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Notes <span className="text-gray-400">(optional)</span>
+                  </label>
+                  <textarea
+                    name="notes"
+                    value={formData.notes}
+                    onChange={handleFormChange}
+                    rows={2}
+                    placeholder="Describe what this bonus is for..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                  />
                 </div>
               </div>
 

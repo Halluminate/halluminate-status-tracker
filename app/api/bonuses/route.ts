@@ -111,6 +111,7 @@ export async function POST(request: Request) {
       newHourlyRate,
       initialReferralCount,
       dataFilesCount,
+      notes,
     } = body;
 
     // Validate required fields
@@ -155,6 +156,7 @@ export async function POST(request: Request) {
       newHourlyRate: newHourlyRate ? Number(newHourlyRate) : undefined,
       initialReferralCount: Number(initialReferralCount) || 0,
       dataFilesCount: Number(dataFilesCount) || 0,
+      notes: notes || undefined,
     });
 
     // Calculate and save the bonus
