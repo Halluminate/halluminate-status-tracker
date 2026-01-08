@@ -7,6 +7,74 @@ import {
   HorizonSession,
   EnvironmentCategory,
 } from './s3-client';
+import { query } from '@/lib/db';
+
+// SME (writer) lookup from PostgreSQL - source of truth for who wrote the problem
+type SMELookup = Map<string, string>; // "problemId|environment" -> SME name
+
+async function buildSMELookup(): Promise<SMELookup> {
+  const lookup = new Map<string, string>();
+
+  try {
+    const results = await query<{ problem_id: string; environment: string; sme_name: string }>(`
+      SELECT p.problem_id, p.environment, e.name as sme_name
+      FROM problems p
+      JOIN experts e ON p.sme_id = e.id
+      WHERE p.sme_id IS NOT NULL AND p.source = 'legacy_sheets'
+    `);
+
+    for (const row of results) {
+      // Key format: "1.1|PE" or "2.3|IB"
+      const key = `${row.problem_id}|${row.environment}`;
+      lookup.set(key, row.sme_name);
+    }
+
+    console.log(`[SME Lookup] Loaded ${lookup.size} SME assignments from PostgreSQL`);
+  } catch (error) {
+    console.error('[SME Lookup] Error loading SME data:', error);
+  }
+
+  return lookup;
+}
+
+// Extract spec number from Horizon environment name
+// e.g., "ib-spec-1-fireside-materials" -> 1, "spec-17-nvidia-model" -> 17
+function extractSpecNumber(environmentName: string): number | null {
+  // Try patterns like "spec-17-...", "ib-spec-1-...", "pe-spec-5-..."
+  const match = environmentName.match(/(?:ib-|pe-)?spec-(\d+)/i);
+  if (match) {
+    return parseInt(match[1], 10);
+  }
+  return null;
+}
+
+// Get the real writer for a problem - prefer PostgreSQL SME, fallback to Horizon session owner
+function getRealWriter(
+  session: HorizonSession,
+  envCategory: 'PE' | 'IB' | null,
+  smeLookup: SMELookup
+): string {
+  // Try to find SME from PostgreSQL (legacy sheets data)
+  if (envCategory) {
+    // Extract spec number from Horizon environment name
+    const specNumber = extractSpecNumber(session.environmentName);
+
+    if (specNumber !== null) {
+      // Build problem ID in sheets format: "{spec}.{problem}"
+      // e.g., spec 1 + problem 5 = "1.5"
+      const problemId = `${specNumber}.${session.problemNumber}`;
+      const key = `${problemId}|${envCategory}`;
+      const smeFromSheets = smeLookup.get(key);
+
+      if (smeFromSheets) {
+        return smeFromSheets;
+      }
+    }
+  }
+
+  // Fallback to Horizon session owner (for new problems not in sheets)
+  return `${session.firstName} ${session.lastName}`;
+}
 
 // Helper to determine if a category is "PE-like" or "IB-like"
 function normalizeCategory(category: EnvironmentCategory | null): 'PE' | 'IB' | null {
@@ -106,7 +174,8 @@ function buildStatusAggregation(
 function buildExpertAggregation(
   sessions: HorizonSession[],
   envCategoryMap: Map<string, EnvironmentCategory>,
-  targetCategory: 'PE' | 'IB'
+  targetCategory: 'PE' | 'IB',
+  smeLookup: SMELookup
 ): ExpertSheetData {
   const aggregation = new Map<string, { [key: string]: number }>();
   const seenProblems = new Map<string, Set<string>>(); // expert -> Set of problem IDs
@@ -117,8 +186,8 @@ function buildExpertAggregation(
 
     if (normalized !== targetCategory) continue;
 
-    // Get expert name (SME = writer)
-    const expertName = `${session.firstName} ${session.lastName}`;
+    // Get the REAL writer (SME) - from PostgreSQL sheets data if available, otherwise Horizon
+    const expertName = getRealWriter(session, normalized, smeLookup);
     if (!expertName.trim()) continue;
 
     // Create unique problem ID
@@ -230,7 +299,11 @@ export async function fetchAllFromHorizon(): Promise<{
   const envCategoryMap = await buildEnvironmentCategoryMap();
   console.log(`[Horizon] Found ${envCategoryMap.size} environments with categories`);
 
-  // 3. Get all sessions for all users
+  // 3. Build SME lookup from PostgreSQL (legacy sheets data)
+  // This gives us the REAL writer for each problem
+  const smeLookup = await buildSMELookup();
+
+  // 4. Get all sessions for all users
   const allSessions: HorizonSession[] = [];
   for (const user of users) {
     const sessions = await getUserSessions(user.firstName, user.lastName);
@@ -238,17 +311,17 @@ export async function fetchAllFromHorizon(): Promise<{
   }
   console.log(`[Horizon] Found ${allSessions.length} total sessions`);
 
-  // 4. Build status aggregations for PE and IB
+  // 5. Build status aggregations for PE and IB
   let peStatusData = buildStatusAggregation(allSessions, envCategoryMap, 'PE');
   let ibStatusData = buildStatusAggregation(allSessions, envCategoryMap, 'IB');
 
-  // 5. Add legacy Taiga delivered counts
+  // 6. Add legacy Taiga delivered counts
   peStatusData = addLegacyDelivered(peStatusData, LEGACY_TAIGA_DELIVERED.PE);
   ibStatusData = addLegacyDelivered(ibStatusData, LEGACY_TAIGA_DELIVERED.IB);
 
-  // 6. Build expert aggregations for PE and IB
-  const peExpertData = buildExpertAggregation(allSessions, envCategoryMap, 'PE');
-  const ibExpertData = buildExpertAggregation(allSessions, envCategoryMap, 'IB');
+  // 7. Build expert aggregations for PE and IB (using SME from PostgreSQL)
+  const peExpertData = buildExpertAggregation(allSessions, envCategoryMap, 'PE', smeLookup);
+  const ibExpertData = buildExpertAggregation(allSessions, envCategoryMap, 'IB', smeLookup);
 
   console.log(`[Horizon] PE: ${peStatusData.grandTotal} problems (includes ${LEGACY_TAIGA_DELIVERED.PE} legacy delivered), IB: ${ibStatusData.grandTotal} problems`);
 
