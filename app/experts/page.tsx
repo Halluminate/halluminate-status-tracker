@@ -359,10 +359,12 @@ export default function ExpertsPage() {
                     <SortHeader label="Total Hrs" sortKeyName="totalHours" className="text-right" />
                     <SortHeader label="Prob/Week" sortKeyName="problemsThisWeek" className="text-right" />
                     <SortHeader label="Prob/Month" sortKeyName="problemsThisMonth" className="text-right" />
+                    <SortHeader label="Total Prob" sortKeyName="totalProblems" className="text-right" />
                     <SortHeader label="Rev/Week" sortKeyName="reviewsThisWeek" className="text-right" />
                     <SortHeader label="Rev/Month" sortKeyName="reviewsThisMonth" className="text-right" />
                     <SortHeader label="Total Rev" sortKeyName="totalReviews" className="text-right" />
                     <SortHeader label="Traj/Month" sortKeyName="trajThisMonth" className="text-right" />
+                    <SortHeader label="Total Traj" sortKeyName="totalTraj" className="text-right" />
                     <SortHeader label="$/Problem" sortKeyName="pricePerProblem" className="text-right" />
                   </tr>
                 </thead>
@@ -406,6 +408,9 @@ export default function ExpertsPage() {
                       <td className="px-3 py-3 whitespace-nowrap text-sm text-right font-mono text-primary">
                         {expert.problemsThisMonth}
                       </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-sm text-right font-mono font-medium text-green-500">
+                        {expert.totalProblems}
+                      </td>
                       <td className="px-3 py-3 whitespace-nowrap text-sm text-right font-mono text-orange-400">
                         {expert.reviewsThisWeek || ''}
                       </td>
@@ -417,6 +422,9 @@ export default function ExpertsPage() {
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap text-sm text-right font-mono text-teal-400">
                         {expert.trajThisMonth || ''}
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-sm text-right font-mono font-medium text-teal-400">
+                        {expert.totalTraj || ''}
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap text-sm text-right font-mono text-muted-foreground">
                         {formatCurrency(expert.pricePerProblem)}
