@@ -193,9 +193,26 @@ export async function GET() {
       problemsThisMonth: 0,
     });
 
+    // Get last Rippling sync time from most recent timecard update
+    const lastSyncResult = await query<{ lastSync: string }>(`
+      SELECT MAX(updated_at) as "lastSync" FROM timecards
+    `);
+    const lastRipplingSync = lastSyncResult[0]?.lastSync || null;
+
+    // Calculate end of week (Saturday) for display
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+
     return NextResponse.json({
       experts: expertStats,
       totals,
+      metadata: {
+        weekStart: startOfWeek.toISOString(),
+        weekEnd: endOfWeek.toISOString(),
+        monthStart: startOfMonth.toISOString(),
+        monthEnd: now.toISOString(),
+        lastRipplingSync,
+      },
     });
   } catch (error) {
     console.error('Error fetching expert stats:', error);
