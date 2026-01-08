@@ -43,6 +43,9 @@ interface ExpertStats {
   reviewsThisWeek: number;
   reviewsThisMonth: number;
   totalReviews: number;
+  trajThisWeek: number;
+  trajThisMonth: number;
+  totalTraj: number;
   pricePerProblem: number | null;
 }
 
@@ -151,14 +154,17 @@ export async function GET() {
       }
     }
 
-    // Build review stats map keyed by lowercase name
-    const reviewsMap = new Map<string, { week: number; month: number; total: number }>();
+    // Build review and trajectory stats map keyed by lowercase name
+    const reviewsMap = new Map<string, { week: number; month: number; total: number; trajWeek: number; trajMonth: number; trajTotal: number }>();
     for (const [expertName, reviewStats] of reviewStatsMap) {
       const key = expertName.toLowerCase().replace(/\s+/g, '-');
       reviewsMap.set(key, {
         week: reviewStats.reviewsThisWeek,
         month: reviewStats.reviewsThisMonth,
         total: reviewStats.totalReviews,
+        trajWeek: reviewStats.problemsReachedTrajThisWeek,
+        trajMonth: reviewStats.problemsReachedTrajThisMonth,
+        trajTotal: reviewStats.totalProblemsReachedTraj,
       });
     }
 
@@ -167,7 +173,7 @@ export async function GET() {
       const horizonKey = expert.horizon_user_id || expert.name.toLowerCase().replace(/\s+/g, '-');
       const hours = hoursMap.get(expert.id) || { total: 0, week: 0, month: 0 };
       const problems = problemsMap.get(horizonKey) || { total: 0, week: 0, month: 0 };
-      const reviews = reviewsMap.get(horizonKey) || { week: 0, month: 0, total: 0 };
+      const reviews = reviewsMap.get(horizonKey) || { week: 0, month: 0, total: 0, trajWeek: 0, trajMonth: 0, trajTotal: 0 };
       const lastActive = lastActiveMap.get(horizonKey) || null;
 
       const totalCost = hours.total * Number(expert.hourly_rate);
@@ -189,6 +195,9 @@ export async function GET() {
         reviewsThisWeek: reviews.week,
         reviewsThisMonth: reviews.month,
         totalReviews: reviews.total,
+        trajThisWeek: reviews.trajWeek,
+        trajThisMonth: reviews.trajMonth,
+        totalTraj: reviews.trajTotal,
         pricePerProblem,
       };
     });
@@ -205,6 +214,9 @@ export async function GET() {
       totalReviews: acc.totalReviews + e.totalReviews,
       reviewsThisWeek: acc.reviewsThisWeek + e.reviewsThisWeek,
       reviewsThisMonth: acc.reviewsThisMonth + e.reviewsThisMonth,
+      totalTraj: acc.totalTraj + e.totalTraj,
+      trajThisWeek: acc.trajThisWeek + e.trajThisWeek,
+      trajThisMonth: acc.trajThisMonth + e.trajThisMonth,
     }), {
       totalExperts: 0,
       totalHours: 0,
@@ -216,6 +228,9 @@ export async function GET() {
       totalReviews: 0,
       reviewsThisWeek: 0,
       reviewsThisMonth: 0,
+      totalTraj: 0,
+      trajThisWeek: 0,
+      trajThisMonth: 0,
     });
 
     // Get last Rippling sync time from most recent timecard update

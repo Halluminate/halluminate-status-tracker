@@ -371,19 +371,41 @@ export async function getActivityByExpert(): Promise<Map<string, ExpertActivityS
   return stats;
 }
 
-// Review tracking from activity log
+// Stage transition entry from admin/process-metrics/stage-transitions.json
+export interface StageTransition {
+  id: string;
+  problemId: string;
+  environmentName: string;
+  problemNumber: number;
+  writer: { firstName: string; lastName: string };
+  fromStatus: string | null;
+  toStatus: string;
+  actor: { firstName: string; lastName: string };
+  timestamp: string;
+}
+
+// Get stage transitions from S3
+export async function getStageTransitions(): Promise<StageTransition[]> {
+  const data = await getJsonFromS3<{ transitions: StageTransition[]; lastPruned?: string }>('admin/process-metrics/stage-transitions.json');
+  return data?.transitions || [];
+}
+
+// Review tracking from stage transitions
 export interface ExpertReviewStats {
   expertName: string;
   reviewsThisWeek: number;
   reviewsThisMonth: number;
   totalReviews: number;
+  problemsReachedTrajThisWeek: number;
+  problemsReachedTrajThisMonth: number;
+  totalProblemsReachedTraj: number;
 }
 
-// Get review counts by expert from activity log
+// Get review counts by expert from stage transitions
 // Reviews are detected by status changes: review_1 → review_2 (Review 1 complete)
 // or review_2 → ready_for_delivery/traj_testing (Review 2 complete)
 export async function getReviewsByExpert(): Promise<Map<string, ExpertReviewStats>> {
-  const activityLog = await getActivityLog(1000); // Get more entries for reviews
+  const transitions = await getStageTransitions();
   const stats = new Map<string, ExpertReviewStats>();
 
   // Calculate date boundaries
@@ -395,46 +417,67 @@ export async function getReviewsByExpert(): Promise<Map<string, ExpertReviewStat
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  for (const entry of activityLog) {
-    // Look for status change activities that indicate a review
-    const isReviewActivity =
-      // Check if it's a status change with review progression
-      (entry.oldValue === 'review_1' && entry.newValue === 'review_2') ||
-      (entry.oldValue === 'review_1' && entry.newValue === 'ready_for_delivery') ||
-      (entry.oldValue === 'review_2' && entry.newValue === 'ready_for_delivery') ||
-      (entry.oldValue === 'review_2' && entry.newValue === 'traj_testing') ||
-      (entry.oldValue === 'review' && entry.newValue === 'review_2') ||
-      (entry.oldValue === 'submitted' && entry.newValue === 'review_2') ||
-      // Also check for explicit review types
-      entry.type === 'review_completed' ||
-      entry.type === 'review_submitted' ||
-      entry.type === 'review_approved' ||
-      // Check description for review keywords
-      (entry.description?.toLowerCase().includes('review') && entry.description?.toLowerCase().includes('complet'));
+  for (const transition of transitions) {
+    const expertName = `${transition.actor.firstName} ${transition.actor.lastName}`;
+    const writerName = `${transition.writer.firstName} ${transition.writer.lastName}`;
+    const transitionDate = new Date(transition.timestamp);
 
-    if (!isReviewActivity) continue;
+    // Check if this is a review completion (actor is different from writer)
+    const isReviewCompletion =
+      (transition.fromStatus === 'review_1' && transition.toStatus === 'review_2') ||
+      (transition.fromStatus === 'review_2' && (transition.toStatus === 'traj_testing' || transition.toStatus === 'ready_for_delivery'));
 
-    const expertName = `${entry.actor.firstName} ${entry.actor.lastName}`;
-    const entryDate = new Date(entry.timestamp);
+    // Check if problem reached trajectory testing (for the writer)
+    const reachedTrajectory = transition.toStatus === 'traj_testing';
 
-    // Initialize if needed
-    if (!stats.has(expertName)) {
-      stats.set(expertName, {
-        expertName,
-        reviewsThisWeek: 0,
-        reviewsThisMonth: 0,
-        totalReviews: 0,
-      });
+    // Track review completions for the actor (reviewer)
+    if (isReviewCompletion) {
+      if (!stats.has(expertName)) {
+        stats.set(expertName, {
+          expertName,
+          reviewsThisWeek: 0,
+          reviewsThisMonth: 0,
+          totalReviews: 0,
+          problemsReachedTrajThisWeek: 0,
+          problemsReachedTrajThisMonth: 0,
+          totalProblemsReachedTraj: 0,
+        });
+      }
+
+      const expertStats = stats.get(expertName)!;
+      expertStats.totalReviews++;
+
+      if (transitionDate >= startOfWeek) {
+        expertStats.reviewsThisWeek++;
+      }
+      if (transitionDate >= startOfMonth) {
+        expertStats.reviewsThisMonth++;
+      }
     }
 
-    const expertStats = stats.get(expertName)!;
-    expertStats.totalReviews++;
+    // Track problems reaching trajectory for the writer
+    if (reachedTrajectory) {
+      if (!stats.has(writerName)) {
+        stats.set(writerName, {
+          expertName: writerName,
+          reviewsThisWeek: 0,
+          reviewsThisMonth: 0,
+          totalReviews: 0,
+          problemsReachedTrajThisWeek: 0,
+          problemsReachedTrajThisMonth: 0,
+          totalProblemsReachedTraj: 0,
+        });
+      }
 
-    if (entryDate >= startOfWeek) {
-      expertStats.reviewsThisWeek++;
-    }
-    if (entryDate >= startOfMonth) {
-      expertStats.reviewsThisMonth++;
+      const writerStats = stats.get(writerName)!;
+      writerStats.totalProblemsReachedTraj++;
+
+      if (transitionDate >= startOfWeek) {
+        writerStats.problemsReachedTrajThisWeek++;
+      }
+      if (transitionDate >= startOfMonth) {
+        writerStats.problemsReachedTrajThisMonth++;
+      }
     }
   }
 

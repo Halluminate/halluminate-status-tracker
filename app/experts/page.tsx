@@ -20,6 +20,9 @@ interface ExpertStats {
   reviewsThisWeek: number;
   reviewsThisMonth: number;
   totalReviews: number;
+  trajThisWeek: number;
+  trajThisMonth: number;
+  totalTraj: number;
   pricePerProblem: number | null;
 }
 
@@ -44,6 +47,9 @@ interface StatsData {
     totalReviews: number;
     reviewsThisWeek: number;
     reviewsThisMonth: number;
+    totalTraj: number;
+    trajThisWeek: number;
+    trajThisMonth: number;
   };
   metadata: Metadata;
 }
@@ -303,6 +309,7 @@ export default function ExpertsPage() {
                     <SortHeader label="Prob/Month" sortKeyName="problemsThisMonth" className="text-right" />
                     <SortHeader label="Rev/Week" sortKeyName="reviewsThisWeek" className="text-right" />
                     <SortHeader label="Rev/Month" sortKeyName="reviewsThisMonth" className="text-right" />
+                    <SortHeader label="Traj/Month" sortKeyName="trajThisMonth" className="text-right" />
                     <SortHeader label="$/Problem" sortKeyName="pricePerProblem" className="text-right" />
                   </tr>
                 </thead>
@@ -354,6 +361,9 @@ export default function ExpertsPage() {
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap text-sm text-right font-mono text-orange-400">
                         {expert.reviewsThisMonth || ''}
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-sm text-right font-mono text-teal-400">
+                        {expert.trajThisMonth || ''}
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap text-sm text-right font-mono text-muted-foreground">
                         {formatCurrency(expert.pricePerProblem)}
