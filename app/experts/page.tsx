@@ -211,36 +211,13 @@ export default function ExpertsPage() {
       <div className="max-w-[1600px] mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Expert Management</h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Hours from Rippling timecards • Problems from Horizon
-                {data?.metadata?.lastRipplingSync && (
-                  <span className="ml-2">• Last sync: {formatSyncTime(data.metadata.lastRipplingSync)}</span>
-                )}
-              </p>
-            </div>
-            {/* Search Input */}
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search experts..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 bg-muted border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-background rounded"
-                >
-                  <X className="h-4 w-4 text-muted-foreground" />
-                </button>
-              )}
-            </div>
-          </div>
+          <h1 className="text-2xl font-bold text-foreground">Expert Management</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Hours from Rippling timecards • Problems from Horizon
+            {data?.metadata?.lastRipplingSync && (
+              <span className="ml-2">• Last sync: {formatSyncTime(data.metadata.lastRipplingSync)}</span>
+            )}
+          </p>
         </div>
 
         {/* Summary Stats */}
@@ -303,6 +280,30 @@ export default function ExpertsPage() {
             <div className="bg-muted rounded-lg p-4">
               <div className="text-xs font-medium text-muted-foreground uppercase">Total Problems</div>
               <div className="text-xl font-bold text-green-500">{data.totals.totalProblems}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Search Bar */}
+        {data && (
+          <div className="mb-4">
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search by name or role..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 bg-muted border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-background rounded"
+                >
+                  <X className="h-4 w-4 text-muted-foreground" />
+                </button>
+              )}
             </div>
           </div>
         )}
