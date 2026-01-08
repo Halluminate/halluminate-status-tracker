@@ -390,22 +390,91 @@ export async function getStageTransitions(): Promise<StageTransition[]> {
   return data?.transitions || [];
 }
 
-// Review tracking from stage transitions
+// Extended session info with reviewer assignments
+export interface SessionWithReviewers {
+  id: string;
+  environmentName: string;
+  problemNumber: number;
+  problemName?: string;
+  workflowStatus: string;
+  writer: { firstName: string; lastName: string };
+  assignedTo?: { firstName: string; lastName: string };  // Current reviewer
+  dataReviewer?: { firstName: string; lastName: string }; // Trajectory reviewer
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// Get all sessions with their reviewer assignments from S3
+export async function getAllSessionsWithReviewers(): Promise<SessionWithReviewers[]> {
+  const users = await getAllHorizonUsers();
+  const sessions: SessionWithReviewers[] = [];
+
+  for (const user of users) {
+    const userKey = `${user.firstName.toLowerCase()}-${user.lastName.toLowerCase()}`;
+    const keys = await listObjectsWithPrefix(`users/${userKey}/`);
+
+    // Find session.json files for each problem
+    const sessionKeys = keys.filter(key => key.endsWith('/session.json'));
+
+    for (const sessionKey of sessionKeys) {
+      const sessionData = await getJsonFromS3<{
+        id: string;
+        firstName: string;
+        lastName: string;
+        environmentName: string;
+        problemNumber: number;
+        problemName?: string;
+        status?: string;
+        workflowStatus?: string;
+        writer?: { firstName: string; lastName: string };
+        assignedTo?: { firstName: string; lastName: string };
+        dataReviewer?: { firstName: string; lastName: string };
+        createdAt: string;
+        updatedAt?: string;
+      }>(sessionKey);
+
+      if (sessionData) {
+        sessions.push({
+          id: sessionData.id,
+          environmentName: sessionData.environmentName,
+          problemNumber: sessionData.problemNumber,
+          problemName: sessionData.problemName,
+          workflowStatus: sessionData.workflowStatus || sessionData.status || 'in_progress',
+          writer: sessionData.writer || { firstName: sessionData.firstName, lastName: sessionData.lastName },
+          assignedTo: sessionData.assignedTo,
+          dataReviewer: sessionData.dataReviewer,
+          createdAt: sessionData.createdAt,
+          updatedAt: sessionData.updatedAt,
+        });
+      }
+    }
+  }
+
+  return sessions;
+}
+
+// Review tracking from session data
 export interface ExpertReviewStats {
   expertName: string;
+  reviewer1Count: number;      // Total Reviewer 1 assignments (assignedTo)
+  reviewer2Count: number;      // Total Reviewer 2 assignments (dataReviewer)
+  totalReviews: number;        // Combined R1 + R2
   reviewsThisWeek: number;
   reviewsThisMonth: number;
-  totalReviews: number;
   problemsReachedTrajThisWeek: number;
   problemsReachedTrajThisMonth: number;
   totalProblemsReachedTraj: number;
 }
 
-// Get review counts by expert from stage transitions
-// Reviews are detected by status changes: review_1 → review_2 (Review 1 complete)
-// or review_2 → ready_for_delivery/traj_testing (Review 2 complete)
+// Get review counts by expert using session data
+// Based on Horizon data model:
+// - assignedTo = Reviewer 1 (first reviewer)
+// - dataReviewer = Reviewer 2 (data/trajectory reviewer)
+// Counts ALL current assignments (not filtered by status)
 export async function getReviewsByExpert(): Promise<Map<string, ExpertReviewStats>> {
+  const sessions = await getAllSessionsWithReviewers();
   const transitions = await getStageTransitions();
+
   const stats = new Map<string, ExpertReviewStats>();
 
   // Calculate date boundaries
@@ -417,59 +486,76 @@ export async function getReviewsByExpert(): Promise<Map<string, ExpertReviewStat
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  for (const transition of transitions) {
-    const expertName = `${transition.actor.firstName} ${transition.actor.lastName}`;
-    const writerName = `${transition.writer.firstName} ${transition.writer.lastName}`;
-    const transitionDate = new Date(transition.timestamp);
+  // Helper to ensure stats entry exists
+  const ensureStats = (name: string): ExpertReviewStats => {
+    if (!stats.has(name)) {
+      stats.set(name, {
+        expertName: name,
+        reviewer1Count: 0,
+        reviewer2Count: 0,
+        totalReviews: 0,
+        reviewsThisWeek: 0,
+        reviewsThisMonth: 0,
+        problemsReachedTrajThisWeek: 0,
+        problemsReachedTrajThisMonth: 0,
+        totalProblemsReachedTraj: 0,
+      });
+    }
+    return stats.get(name)!;
+  };
 
-    // Check if this is a review completion (actor is different from writer)
-    const isReviewCompletion =
-      (transition.fromStatus === 'review_1' && transition.toStatus === 'review_2') ||
-      (transition.fromStatus === 'review_2' && (transition.toStatus === 'traj_testing' || transition.toStatus === 'ready_for_delivery'));
+  // Count reviews from session state
+  for (const session of sessions) {
+    // Reviewer 1: assignedTo field (count ALL assignments)
+    if (session.assignedTo && session.assignedTo.firstName) {
+      const r1Name = `${session.assignedTo.firstName} ${session.assignedTo.lastName}`.trim();
+      if (r1Name) {
+        const r1Stats = ensureStats(r1Name);
+        r1Stats.reviewer1Count++;
+        r1Stats.totalReviews++;
 
-    // Check if problem reached trajectory testing (for the writer)
-    const reachedTrajectory = transition.toStatus === 'traj_testing';
-
-    // Track review completions for the actor (reviewer)
-    if (isReviewCompletion) {
-      if (!stats.has(expertName)) {
-        stats.set(expertName, {
-          expertName,
-          reviewsThisWeek: 0,
-          reviewsThisMonth: 0,
-          totalReviews: 0,
-          problemsReachedTrajThisWeek: 0,
-          problemsReachedTrajThisMonth: 0,
-          totalProblemsReachedTraj: 0,
-        });
-      }
-
-      const expertStats = stats.get(expertName)!;
-      expertStats.totalReviews++;
-
-      if (transitionDate >= startOfWeek) {
-        expertStats.reviewsThisWeek++;
-      }
-      if (transitionDate >= startOfMonth) {
-        expertStats.reviewsThisMonth++;
+        // Use updatedAt for timing
+        if (session.updatedAt) {
+          const updatedDate = new Date(session.updatedAt);
+          if (updatedDate >= startOfWeek) {
+            r1Stats.reviewsThisWeek++;
+          }
+          if (updatedDate >= startOfMonth) {
+            r1Stats.reviewsThisMonth++;
+          }
+        }
       }
     }
 
-    // Track problems reaching trajectory for the writer
-    if (reachedTrajectory) {
-      if (!stats.has(writerName)) {
-        stats.set(writerName, {
-          expertName: writerName,
-          reviewsThisWeek: 0,
-          reviewsThisMonth: 0,
-          totalReviews: 0,
-          problemsReachedTrajThisWeek: 0,
-          problemsReachedTrajThisMonth: 0,
-          totalProblemsReachedTraj: 0,
-        });
-      }
+    // Reviewer 2: dataReviewer field (count ALL assignments)
+    if (session.dataReviewer && session.dataReviewer.firstName) {
+      const r2Name = `${session.dataReviewer.firstName} ${session.dataReviewer.lastName}`.trim();
+      if (r2Name) {
+        const r2Stats = ensureStats(r2Name);
+        r2Stats.reviewer2Count++;
+        r2Stats.totalReviews++;
 
-      const writerStats = stats.get(writerName)!;
+        // Use updatedAt for timing
+        if (session.updatedAt) {
+          const updatedDate = new Date(session.updatedAt);
+          if (updatedDate >= startOfWeek) {
+            r2Stats.reviewsThisWeek++;
+          }
+          if (updatedDate >= startOfMonth) {
+            r2Stats.reviewsThisMonth++;
+          }
+        }
+      }
+    }
+  }
+
+  // Track problems reaching trajectory for the writer using transitions (for accurate timing)
+  for (const transition of transitions) {
+    if (transition.toStatus === 'traj_testing') {
+      const writerName = `${transition.writer.firstName} ${transition.writer.lastName}`;
+      const transitionDate = new Date(transition.timestamp);
+
+      const writerStats = ensureStats(writerName);
       writerStats.totalProblemsReachedTraj++;
 
       if (transitionDate >= startOfWeek) {
