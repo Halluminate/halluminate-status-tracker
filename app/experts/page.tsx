@@ -57,12 +57,18 @@ interface StatsData {
 type SortKey = keyof ExpertStats;
 type SortDirection = 'asc' | 'desc';
 
+interface SortCriteria {
+  key: SortKey;
+  direction: SortDirection;
+}
+
 export default function ExpertsPage() {
   const [data, setData] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sortKey, setSortKey] = useState<SortKey>('totalHours');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [sortCriteria, setSortCriteria] = useState<SortCriteria[]>([
+    { key: 'totalHours', direction: 'desc' }
+  ]);
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -85,13 +91,41 @@ export default function ExpertsPage() {
     fetchData();
   }, []);
 
-  const handleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+  // Handle sort: click = set primary, shift+click = add secondary sort
+  const handleSort = (key: SortKey, event: React.MouseEvent) => {
+    const existingIndex = sortCriteria.findIndex(c => c.key === key);
+
+    if (event.shiftKey) {
+      // Shift+click: add to multi-sort or toggle existing
+      if (existingIndex >= 0) {
+        // Toggle direction of existing criteria
+        setSortCriteria(prev => prev.map((c, i) =>
+          i === existingIndex ? { ...c, direction: c.direction === 'asc' ? 'desc' : 'asc' } : c
+        ));
+      } else {
+        // Add as new criteria (max 3)
+        if (sortCriteria.length < 3) {
+          setSortCriteria(prev => [...prev, { key, direction: 'desc' }]);
+        }
+      }
     } else {
-      setSortKey(key);
-      setSortDirection('desc');
+      // Regular click: set as primary sort
+      if (existingIndex === 0) {
+        // Toggle direction if already primary
+        setSortCriteria(prev => [{ ...prev[0], direction: prev[0].direction === 'asc' ? 'desc' : 'asc' }]);
+      } else {
+        // Set as new primary sort
+        setSortCriteria([{ key, direction: 'desc' }]);
+      }
     }
+  };
+
+  // Get sort indicator for a column
+  const getSortIndicator = (key: SortKey) => {
+    const index = sortCriteria.findIndex(c => c.key === key);
+    if (index < 0) return null;
+    const direction = sortCriteria[index].direction === 'asc' ? '↑' : '↓';
+    return sortCriteria.length > 1 ? `${index + 1}${direction}` : direction;
   };
 
   // Filter experts by search query, then sort
@@ -106,22 +140,31 @@ export default function ExpertsPage() {
         )
       : data.experts;
 
-    // Sort filtered results
+    // Multi-column sort
     return [...filtered].sort((a, b) => {
-      const aVal = a[sortKey];
-      const bVal = b[sortKey];
-      const multiplier = sortDirection === 'asc' ? 1 : -1;
+      for (const criteria of sortCriteria) {
+        const aVal = a[criteria.key];
+        const bVal = b[criteria.key];
+        const multiplier = criteria.direction === 'asc' ? 1 : -1;
 
-      if (aVal === null && bVal === null) return 0;
-      if (aVal === null) return 1;
-      if (bVal === null) return -1;
+        if (aVal === null && bVal === null) continue;
+        if (aVal === null) return 1;
+        if (bVal === null) return -1;
 
-      if (typeof aVal === 'number' && typeof bVal === 'number') {
-        return (aVal - bVal) * multiplier;
+        let comparison = 0;
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+          comparison = aVal - bVal;
+        } else {
+          comparison = String(aVal).localeCompare(String(bVal));
+        }
+
+        if (comparison !== 0) {
+          return comparison * multiplier;
+        }
       }
-      return String(aVal).localeCompare(String(bVal)) * multiplier;
+      return 0;
     });
-  }, [data?.experts, searchQuery, sortKey, sortDirection]);
+  }, [data?.experts, searchQuery, sortCriteria]);
 
   const formatCurrency = (value: number | null) => {
     if (value === null) return '-';
@@ -159,15 +202,17 @@ export default function ExpertsPage() {
   };
 
   const SortHeader = ({ label, sortKeyName, className = '', tooltip }: { label: string; sortKeyName: SortKey; className?: string; tooltip?: React.ReactNode }) => {
+    const indicator = getSortIndicator(sortKeyName);
     return (
       <th
         className={`px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted/50 ${className}`}
-        onClick={() => handleSort(sortKeyName)}
+        onClick={(e) => handleSort(sortKeyName, e)}
+        title="Click to sort, Shift+Click to add secondary sort"
       >
         <div className="flex items-center gap-1">
           {label}
-          {sortKey === sortKeyName && (
-            <span className="text-primary">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+          {indicator && (
+            <span className="text-primary text-[10px] font-bold">{indicator}</span>
           )}
           {tooltip && (
             <Tooltip>
