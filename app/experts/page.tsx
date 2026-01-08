@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { Info } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Info, Search, X } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ExpertStats {
@@ -63,6 +63,7 @@ export default function ExpertsPage() {
   const [error, setError] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>('totalHours');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -93,22 +94,34 @@ export default function ExpertsPage() {
     }
   };
 
-  const sortedExperts = data?.experts
-    ? [...data.experts].sort((a, b) => {
-        const aVal = a[sortKey];
-        const bVal = b[sortKey];
-        const multiplier = sortDirection === 'asc' ? 1 : -1;
+  // Filter experts by search query, then sort
+  const sortedExperts = useMemo(() => {
+    if (!data?.experts) return [];
 
-        if (aVal === null && bVal === null) return 0;
-        if (aVal === null) return 1;
-        if (bVal === null) return -1;
+    // Filter by search query (case-insensitive, matches name or role)
+    const filtered = searchQuery.trim()
+      ? data.experts.filter(expert =>
+          expert.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          expert.role.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      : data.experts;
 
-        if (typeof aVal === 'number' && typeof bVal === 'number') {
-          return (aVal - bVal) * multiplier;
-        }
-        return String(aVal).localeCompare(String(bVal)) * multiplier;
-      })
-    : [];
+    // Sort filtered results
+    return [...filtered].sort((a, b) => {
+      const aVal = a[sortKey];
+      const bVal = b[sortKey];
+      const multiplier = sortDirection === 'asc' ? 1 : -1;
+
+      if (aVal === null && bVal === null) return 0;
+      if (aVal === null) return 1;
+      if (bVal === null) return -1;
+
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return (aVal - bVal) * multiplier;
+      }
+      return String(aVal).localeCompare(String(bVal)) * multiplier;
+    });
+  }, [data?.experts, searchQuery, sortKey, sortDirection]);
 
   const formatCurrency = (value: number | null) => {
     if (value === null) return '-';
@@ -198,13 +211,36 @@ export default function ExpertsPage() {
       <div className="max-w-[1600px] mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-foreground">Expert Management</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Hours from Rippling timecards • Problems from Horizon
-            {data?.metadata?.lastRipplingSync && (
-              <span className="ml-2">• Last sync: {formatSyncTime(data.metadata.lastRipplingSync)}</span>
-            )}
-          </p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">Expert Management</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Hours from Rippling timecards • Problems from Horizon
+                {data?.metadata?.lastRipplingSync && (
+                  <span className="ml-2">• Last sync: {formatSyncTime(data.metadata.lastRipplingSync)}</span>
+                )}
+              </p>
+            </div>
+            {/* Search Input */}
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search experts..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 bg-muted border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-background rounded"
+                >
+                  <X className="h-4 w-4 text-muted-foreground" />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Summary Stats */}
@@ -383,7 +419,19 @@ export default function ExpertsPage() {
         {/* Empty State */}
         {data && sortedExperts.length === 0 && (
           <div className="bg-card rounded-lg shadow-sm border border-border p-12 text-center">
-            <p className="text-muted-foreground">No experts found.</p>
+            <p className="text-muted-foreground">
+              {searchQuery
+                ? `No experts matching "${searchQuery}"`
+                : 'No experts found.'}
+            </p>
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="mt-2 text-sm text-primary hover:underline"
+              >
+                Clear search
+              </button>
+            )}
           </div>
         )}
       </div>
