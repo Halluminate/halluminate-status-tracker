@@ -12,6 +12,11 @@ CREATE TABLE IF NOT EXISTS experts (
     rippling_id TEXT,
     hourly_rate DECIMAL(10,2) NOT NULL DEFAULT 150.00,
     email TEXT,
+    horizon_user_id TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    source TEXT DEFAULT 'manual',
+    problems_completed INTEGER DEFAULT 0,
+    problem_bonus_earned DECIMAL(10,2) DEFAULT 0,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -79,6 +84,65 @@ CREATE TABLE IF NOT EXISTS weekly_snapshots (
     total_cost DECIMAL(10,2) DEFAULT 0,
     created_at TIMESTAMP DEFAULT NOW(),
     UNIQUE(expert_id, week_start)
+);
+
+-- ============================================
+-- TIMECARDS TABLE (Rippling data)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS timecards (
+    id SERIAL PRIMARY KEY,
+    expert_id INTEGER REFERENCES experts(id),
+    employee_name TEXT NOT NULL,
+    period_start DATE NOT NULL,
+    period_end DATE NOT NULL,
+    status TEXT,
+    hours_regular DECIMAL(10,2) DEFAULT 0,
+    hours_approved DECIMAL(10,2) DEFAULT 0,
+    hours_total DECIMAL(10,2) DEFAULT 0,
+    alerts INTEGER DEFAULT 0,
+    time_off_pto_paid DECIMAL(10,2) DEFAULT 0,
+    time_off_pto_unpaid DECIMAL(10,2) DEFAULT 0,
+    holidays_paid DECIMAL(10,2) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(employee_name, period_start, period_end)
+);
+
+CREATE INDEX IF NOT EXISTS idx_timecards_expert ON timecards(expert_id);
+CREATE INDEX IF NOT EXISTS idx_timecards_period ON timecards(period_start, period_end);
+
+-- ============================================
+-- EXPERT RATE HISTORY (track promotions)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS expert_rate_history (
+    id SERIAL PRIMARY KEY,
+    expert_id INTEGER NOT NULL REFERENCES experts(id),
+    hourly_rate DECIMAL(10,2) NOT NULL,
+    effective_date DATE NOT NULL,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(expert_id, effective_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rate_history_expert_date ON expert_rate_history(expert_id, effective_date);
+
+-- ============================================
+-- EXPERT BONUSES (per-problem bonuses)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS expert_bonuses (
+    id SERIAL PRIMARY KEY,
+    expert_id INTEGER NOT NULL REFERENCES experts(id),
+    period_start DATE NOT NULL,
+    period_end DATE NOT NULL,
+    problems_completed INTEGER DEFAULT 0,
+    bonus_per_problem DECIMAL(10,2) DEFAULT 100.00,
+    total_bonus DECIMAL(10,2) DEFAULT 0,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(expert_id, period_start, period_end)
 );
 
 -- ============================================
